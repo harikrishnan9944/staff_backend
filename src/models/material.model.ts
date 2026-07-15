@@ -1,0 +1,123 @@
+import { Schema, model, Document, Types } from 'mongoose';
+
+export interface IMaterial extends Document {
+  projectId: Types.ObjectId;
+  categoryId?: Types.ObjectId;
+  materialName: string;
+  brand: string;
+  description?: string;
+  quantity: number;
+  unit: string; // e.g. 'kg', 'sqft', 'pcs', 'bags'
+  estimatedCost: number;
+  vendorId?: Types.ObjectId;
+  priority: 'High' | 'Medium' | 'Low';
+  status: 'Pending' | 'Selection' | 'Quotation' | 'Purchase' | 'Invoice Uploaded' | 'Completed' | 'Cancelled';
+  assignedUser?: Types.ObjectId;
+  materialImage?: string;
+  remarks?: string;
+  createdBy: Types.ObjectId;
+  createdByRole?: string;
+  lastUpdatedBy?: Types.ObjectId;
+  lastUpdatedByRole?: string;
+  lastUpdatedDate?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const MaterialSchema = new Schema<IMaterial>(
+  {
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      required: [true, 'Project ID is required'],
+    },
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      required: false,
+    },
+    materialName: {
+      type: String,
+      required: [true, 'Material name is required'],
+      trim: true,
+    },
+    brand: {
+      type: String,
+      required: [true, 'Brand is required'],
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    quantity: {
+      type: Number,
+      required: [true, 'Quantity is required'],
+      min: [0, 'Quantity cannot be negative'],
+    },
+    unit: {
+      type: String,
+      required: false,
+      default: 'pcs',
+      trim: true,
+    },
+    estimatedCost: {
+      type: Number,
+      required: false,
+      default: 0,
+      min: [0, 'Estimated cost cannot be negative'],
+    },
+    vendorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User', // Vendors can be users in the system or custom entities
+    },
+    priority: {
+      type: String,
+      enum: ['High', 'Medium', 'Low'],
+      default: 'Medium',
+    },
+    status: {
+      type: String,
+      enum: ['Pending', 'Selection', 'Quotation', 'Purchase', 'Invoice Uploaded', 'Completed', 'Cancelled'],
+      default: 'Pending',
+    },
+    assignedUser: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    materialImage: {
+      type: String,
+      default: '',
+    },
+    remarks: {
+      type: String,
+      trim: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    createdByRole: {
+      type: String,
+    },
+    lastUpdatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    lastUpdatedByRole: {
+      type: String,
+    },
+    lastUpdatedDate: {
+      type: Date,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Compound index for search performance
+MaterialSchema.index({ categoryId: 1, materialName: 1 });
+
+export const Material = model<IMaterial>('Material', MaterialSchema);

@@ -1,0 +1,36 @@
+import { Router } from 'express';
+import {
+  getUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  updateStatus,
+  resetPassword,
+  getUserPermissions,
+} from '../controllers/user.controller';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { validateRequest } from '../middlewares/validate.middleware';
+import { registerSchema } from '../validation/auth.validation';
+
+const router = Router();
+
+// All routes require authentication
+router.use(authenticate);
+
+// Admin-only operations
+router.get('/', authorize(['Admin']), getUsers);
+router.post('/', authorize(['Admin']), validateRequest(registerSchema), createUser);
+router.put('/:id', authorize(['Admin']), updateUser);
+router.delete('/:id', authorize(['Admin']), deleteUser);
+
+router.patch('/status', authorize(['Admin']), updateStatus);
+router.patch('/reset-password', authorize(['Admin']), resetPassword);
+
+// Shared operation: Get user's own merged permissions list
+router.get('/permissions', getUserPermissions);
+
+// Shared operation: User profile retrieval (controller handles Self vs Admin authorization)
+router.get('/:id', getUserById);
+
+export default router;
