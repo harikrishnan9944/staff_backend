@@ -11,7 +11,7 @@ export interface IMaterial extends Document {
   estimatedCost: number;
   vendorId?: Types.ObjectId;
   priority: 'High' | 'Medium' | 'Low';
-  status: 'Pending' | 'Selection' | 'Quotation' | 'Purchase' | 'Invoice Uploaded' | 'Completed' | 'Cancelled';
+  status: 'Registered' | 'Quotation Set' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
   assignedUser?: Types.ObjectId;
   materialImage?: string;
   remarks?: string;
@@ -78,8 +78,8 @@ const MaterialSchema = new Schema<IMaterial>(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Selection', 'Quotation', 'Purchase', 'Invoice Uploaded', 'Completed', 'Cancelled'],
-      default: 'Pending',
+      enum: ['Registered', 'Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded', 'Cancelled'],
+      default: 'Registered',
     },
     assignedUser: {
       type: Schema.Types.ObjectId,

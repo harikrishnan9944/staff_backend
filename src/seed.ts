@@ -116,7 +116,7 @@ const seedDB = async () => {
     console.log('Seeding company profile...');
     await CompanySettings.create({
       companyName: 'Nila Construction Group Ltd',
-      companyLogo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=256&h=256',
+      companyLogo: 'http://localhost:5000/uploads/logo.png',
       address: '128 Wacker Drive, Chicago, IL, USA',
       phone: '+1 555-0199',
       email: 'info@nilagroup.com',
@@ -163,7 +163,7 @@ const seedDB = async () => {
       unit: 'sqft',
       estimatedCost: 15,
       priority: 'High',
-      status: 'Purchase',
+      status: 'Purchase Completed',
       assignedUser: architectUser._id,
       remarks: 'Architect selected galaxy pattern.',
       createdBy: managerUser._id,
@@ -178,7 +178,7 @@ const seedDB = async () => {
       unit: 'rolls',
       estimatedCost: 45,
       priority: 'High',
-      status: 'Completed',
+      status: 'Bill Uploaded',
       assignedUser: supervisorUser._id,
       remarks: 'Delivered and verified by accountant.',
       createdBy: managerUser._id,

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Purchase } from '../models/purchase.model';
 import { Activity } from '../models/activity.model';
 import { MaterialWorkflow } from '../models/workflow.model';
+import { Material } from '../models/material.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 // Helper to generate a unique PO number: PO-YYYYMMDD-XXXX
@@ -178,6 +179,9 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
       { materialId },
       { status: 'Waiting for Purchase', currentStage: 'Purchase' }
     );
+
+    // Transition Material status to 'Purchase Completed'
+    await Material.findByIdAndUpdate(materialId, { status: 'Purchase Completed' });
 
     const populatedPurchase = await Purchase.findById(purchase._id)
       .populate('projectId', 'name')

@@ -55,6 +55,9 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       status: 'Pending',
     });
 
+    // Transition Material status to 'Quotation Set'
+    await Material.findByIdAndUpdate(materialId, { status: 'Quotation Set' });
+
     res.status(201).json({
       success: true,
       message: 'Quotation submitted successfully',
@@ -92,8 +95,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
           { status: 'Rejected' }
         );
 
-        // Transition Material status to 'Purchase'
-        await Material.findByIdAndUpdate(quotation.materialId, { status: 'Purchase' });
+        // Transition Material status to 'Quotation Approved'
+        await Material.findByIdAndUpdate(quotation.materialId, { status: 'Quotation Approved' });
 
         // Update MaterialWorkflow stage to 'Purchase'
         await MaterialWorkflow.findOneAndUpdate(

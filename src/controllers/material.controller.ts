@@ -119,7 +119,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       estimatedCost: estimatedCost !== undefined ? estimatedCost : 0,
       vendorId,
       priority: priority || 'Medium',
-      status: 'Pending',
+      status: 'Registered',
       assignedUser,
       materialImage: materialImage || '',
       remarks: remarks || '',

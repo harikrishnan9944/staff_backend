@@ -3,6 +3,7 @@ import { Invoice } from '../models/invoice.model';
 import { Purchase } from '../models/purchase.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Activity } from '../models/activity.model';
+import { Material } from '../models/material.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { uploadToCloudinary } from '../config/cloudinary';
 
@@ -160,6 +161,9 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
       { materialId: purchase.materialId },
       { status: 'Invoice Uploaded', currentStage: 'Invoice Upload', progress: 85 }
     );
+
+    // Transition Material status to 'Bill Uploaded'
+    await Material.findByIdAndUpdate(purchase.materialId, { status: 'Bill Uploaded' });
 
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate('projectId', 'name')
