@@ -2,7 +2,71 @@ import { Response } from 'express';
 import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
 import { Activity } from '../models/activity.model';
+import { Quotation } from '../models/quotation.model';
+import { Purchase } from '../models/purchase.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+
+const syncMaterialRelatedRecords = async (material: any, userId: any) => {
+  try {
+    const status = material.status;
+    const matId = material._id;
+
+    if (['Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status)) {
+      const existingQuote = await Quotation.findOne({ materialId: matId });
+      if (!existingQuote) {
+        await Quotation.create({
+          materialId: matId,
+          vendor: 'Vendor',
+          amount: material.estimatedCost || (material.quantity * 10) || 0,
+          description: material.description || material.remarks || 'Quotation record auto-generated',
+          status: ['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status) ? 'Approved' : 'Pending',
+        });
+      } else if (['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status) && existingQuote.status !== 'Approved') {
+        existingQuote.status = 'Approved';
+        await existingQuote.save();
+      }
+    }
+
+    if (['Purchase Completed', 'Bill Uploaded'].includes(status)) {
+      const existingPurchase = await Purchase.findOne({ materialId: matId });
+      if (!existingPurchase) {
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const count = await Purchase.countDocuments();
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const purchaseOrderNumber = `PO-${dateStr}-${String(count + 1).padStart(4, '0')}-${randomNum}`;
+
+        await Purchase.create({
+          purchaseOrderNumber,
+          projectId: material.projectId,
+          materialId: matId,
+          vendorName: 'Vendor',
+          purchaseAmount: material.estimatedCost || (material.quantity * 10) || 0,
+          gst: 0,
+          discount: 0,
+          finalAmount: material.estimatedCost || (material.quantity * 10) || 0,
+          purchaseDate: new Date(),
+          expectedDeliveryDate: new Date(),
+          deliveryStatus: status === 'Bill Uploaded' ? 'Delivered' : 'Ordered',
+          paymentStatus: 'Pending',
+          status: status === 'Bill Uploaded' ? 'Completed' : 'Approved',
+          attachments: status === 'Bill Uploaded' ? ['bill-invoice.pdf'] : [],
+          remarks: material.description || material.remarks || 'Purchase order generated from material status',
+          createdBy: userId,
+        });
+      } else if (status === 'Bill Uploaded') {
+        if (existingPurchase.attachments.length === 0) {
+          existingPurchase.attachments = ['bill-invoice.pdf'];
+        }
+        existingPurchase.status = 'Completed';
+        existingPurchase.deliveryStatus = 'Delivered';
+        await existingPurchase.save();
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing material related records:', err);
+    // Catch internally to prevent throwing HTTP 500 in controllers
+  }
+};
 
 // GET /api/materials
 // Authenticated user - Retrieve materials with search, filter, and sort
@@ -11,11 +75,11 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
     const { projectId, categoryId, search, status, priority, brand, assignedUser, sort } = req.query;
 
     const query: any = {};
-    if (projectId) {
+    if (projectId && projectId !== 'undefined' && projectId !== 'null') {
       query.projectId = projectId;
     }
 
-    if (categoryId) {
+    if (categoryId && categoryId !== 'undefined' && categoryId !== 'null') {
       query.categoryId = categoryId;
     }
 
@@ -97,6 +161,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       estimatedCost,
       vendorId,
       priority,
+      status,
       remarks,
       assignedUser,
       materialImage,
@@ -119,13 +184,16 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       estimatedCost: estimatedCost !== undefined ? estimatedCost : 0,
       vendorId,
       priority: priority || 'Medium',
-      status: 'Registered',
+      status: status || 'Registered',
       assignedUser,
       materialImage: materialImage || '',
       remarks: remarks || '',
       createdBy: user?._id,
       createdByRole: user?.role || 'Architect',
     });
+
+    // Auto-sync Quotation & Purchase records if status requires them
+    await syncMaterialRelatedRecords(material, user?._id);
 
     // Create activity log entry
     await Activity.create({
@@ -190,6 +258,9 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     material.lastUpdatedDate = new Date();
 
     await material.save();
+
+    // Auto-sync Quotation & Purchase records if status requires them
+    await syncMaterialRelatedRecords(material, user._id);
 
     // Log activity
     await Activity.create({

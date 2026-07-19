@@ -17,6 +17,11 @@ export const registerSchema = z.object({
   email: z.string({ required_error: 'Email is required' }).email('Invalid email address'),
   phone: z.string().optional(),
   profileImage: z.string().url('Profile image must be a valid URL').optional().or(z.literal('')),
+  isActive: z.boolean().optional(),
+  employeeId: z.string().optional(),
+  department: z.string().optional(),
+  joiningDate: z.string().optional(),
+  remarks: z.string().optional(),
 });
 
 export const loginSchema = z.object({

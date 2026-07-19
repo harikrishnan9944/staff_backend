@@ -2,6 +2,10 @@ import { Response } from 'express';
 import { User, IUser } from '../models/user.model';
 import { RefreshToken } from '../models/token.model';
 import { Role } from '../models/role.model';
+import { ProjectMember } from '../models/projectMember.model';
+import { Project } from '../models/project.model';
+import { AuditLog } from '../models/auditLog.model';
+import { LoginHistory } from '../models/loginHistory.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import bcrypt from 'bcryptjs';
 
@@ -104,7 +108,20 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 // Admin only - Create user
 export const createUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, username, password, role, email, phone, profileImage, isActive } = req.body;
+    const { 
+      name, 
+      username, 
+      password, 
+      role, 
+      email, 
+      phone, 
+      profileImage, 
+      isActive, 
+      employeeId, 
+      department, 
+      joiningDate, 
+      remarks 
+    } = req.body;
     const adminUser = req.user;
 
     // Check unique username
@@ -121,6 +138,15 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    // Check unique employee ID if provided
+    if (employeeId) {
+      const empExists = await User.findOne({ employeeId });
+      if (empExists) {
+        res.status(400).json({ success: false, message: 'Employee ID is already registered' });
+        return;
+      }
+    }
+
     const newUser = await User.create({
       name,
       username,
@@ -130,6 +156,10 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
       phone,
       profileImage: profileImage || '',
       isActive: isActive !== undefined ? isActive : true,
+      employeeId: employeeId ? employeeId.trim() : undefined,
+      department,
+      joiningDate: joiningDate ? new Date(joiningDate) : undefined,
+      remarks: remarks || '',
       createdBy: adminUser?._id,
     });
 
@@ -153,7 +183,19 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
 export const updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, phone, role, profileImage, isActive } = req.body;
+    const { 
+      name, 
+      email, 
+      phone, 
+      role, 
+      profileImage, 
+      isActive, 
+      employeeId, 
+      department, 
+      joiningDate, 
+      remarks, 
+      password 
+    } = req.body;
 
     const user = await User.findById(id);
     if (!user) {
@@ -170,15 +212,32 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
       }
     }
 
+    // Check unique employeeId if it changed
+    if (employeeId && employeeId.trim() !== user.employeeId) {
+      const empExists = await User.findOne({ employeeId: employeeId.trim() });
+      if (empExists) {
+        res.status(400).json({ success: false, message: 'Employee ID is already registered by another user' });
+        return;
+      }
+    }
+
     // Update fields
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (phone !== undefined) user.phone = phone;
     if (role !== undefined) user.role = role;
     if (profileImage !== undefined) user.profileImage = profileImage;
+    if (department !== undefined) user.department = department;
+    if (joiningDate !== undefined) user.joiningDate = joiningDate ? new Date(joiningDate) : undefined;
+    if (remarks !== undefined) user.remarks = remarks;
+    if (employeeId !== undefined) user.employeeId = employeeId ? employeeId.trim() : undefined;
+
+    if (password) {
+      user.password = password; // Will be hashed by pre-save hook
+    }
+
     if (isActive !== undefined) {
       user.isActive = isActive;
-      // If deactivating, delete all active refresh sessions for this user
       if (!isActive) {
         await RefreshToken.deleteMany({ userId: user._id });
       }
@@ -342,6 +401,202 @@ export const getUserPermissions = async (req: AuthRequest, res: Response): Promi
     });
   } catch (error) {
     console.error('getUserPermissions error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// POST /api/users/assign
+export const assignProjectStaff = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { projectId, userId, role, confirmOverride } = req.body;
+
+    if (!projectId || !userId || !role) {
+      res.status(400).json({ success: false, message: 'projectId, userId and role are required' });
+      return;
+    }
+
+    // Check if target user exists
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    // Validate unique role constraint: Operation Head & Project Manager
+    if (['Operation Head', 'Project Manager'].includes(role)) {
+      const existingAssignment = await ProjectMember.findOne({ projectId, role })
+        .populate('userId', 'name username');
+
+      if (existingAssignment) {
+        const assignedUser = existingAssignment.userId as any;
+        if (assignedUser._id.toString() === userId.toString()) {
+          res.status(200).json({ success: true, message: 'User already assigned to this role' });
+          return;
+        }
+
+        if (!confirmOverride) {
+          res.status(409).json({
+            success: false,
+            code: 'ROLE_ALREADY_ASSIGNED',
+            message: `Role '${role}' is already assigned to '${assignedUser.name}'. Do you want to replace them?`,
+            existingUser: assignedUser
+          });
+          return;
+        }
+
+        await ProjectMember.findByIdAndDelete(existingAssignment._id);
+
+        // Check if the replaced user has other roles in this project
+        const otherAssignments = await ProjectMember.findOne({ projectId, userId: assignedUser._id });
+        if (!otherAssignments) {
+          await Project.findByIdAndUpdate(projectId, {
+            $pull: { assignedUsers: assignedUser._id }
+          });
+        }
+
+        await AuditLog.create({
+          performedBy: req.user!._id,
+          action: 'REMOVE_ROLE',
+          projectId,
+          targetUserId: assignedUser._id,
+          details: `Replaced '${assignedUser.name}' with '${targetUser.name}' as '${role}'`
+        });
+      }
+    }
+
+    const newMember = await ProjectMember.findOneAndUpdate(
+      { projectId, userId, role },
+      { projectId, userId, role },
+      { upsert: true, new: true }
+    );
+
+    // Sync Project.assignedUsers
+    await Project.findByIdAndUpdate(projectId, {
+      $addToSet: { assignedUsers: userId }
+    });
+
+    await AuditLog.create({
+      performedBy: req.user!._id,
+      action: 'ASSIGN_ROLE',
+      projectId,
+      targetUserId: userId,
+      details: `Assigned user '${targetUser.name}' to project role '${role}'`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully assigned '${targetUser.name}' as '${role}'`,
+      member: newMember
+    });
+  } catch (error) {
+    console.error('assignProjectStaff error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// POST /api/users/remove-assignment
+export const removeProjectStaff = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { projectId, userId, role } = req.body;
+
+    if (!projectId || !userId || !role) {
+      res.status(400).json({ success: false, message: 'projectId, userId and role are required' });
+      return;
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    const deleted = await ProjectMember.findOneAndDelete({ projectId, userId, role });
+    if (!deleted) {
+      res.status(404).json({ success: false, message: 'Assignment not found' });
+      return;
+    }
+
+    // Sync Project.assignedUsers: check if user has other assignments in the project
+    const otherAssignments = await ProjectMember.findOne({ projectId, userId });
+    if (!otherAssignments) {
+      await Project.findByIdAndUpdate(projectId, {
+        $pull: { assignedUsers: userId }
+      });
+    }
+
+    await AuditLog.create({
+      performedBy: req.user!._id,
+      action: 'REMOVE_ROLE',
+      projectId,
+      targetUserId: userId,
+      details: `Removed user '${targetUser.name}' from project role '${role}'`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully removed '${targetUser.name}' from '${role}'`
+    });
+  } catch (error) {
+    console.error('removeProjectStaff error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// GET /api/users/project/:projectId
+export const getProjectStaff = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+
+    const members = await ProjectMember.find({ projectId })
+      .populate('userId', 'name username role email phone profileImage employeeId department isActive');
+
+    res.status(200).json({
+      success: true,
+      count: members.length,
+      members
+    });
+  } catch (error) {
+    console.error('getProjectStaff error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// GET /api/users/audit-logs
+export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const logs = await AuditLog.find({})
+      .populate('performedBy', 'name username')
+      .populate('targetUserId', 'name username')
+      .populate('projectId', 'name')
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      logs
+    });
+  } catch (error) {
+    console.error('getAuditLogs error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// GET /api/users/login-history
+export const getLoginHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const history = await LoginHistory.find({})
+      .populate('userId', 'name username role email employeeId')
+      .sort({ timestamp: -1 })
+      .limit(100);
+
+    res.status(200).json({
+      success: true,
+      count: history.length,
+      history
+    });
+  } catch (error) {
+    console.error('getLoginHistory error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };

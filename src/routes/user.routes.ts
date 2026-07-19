@@ -8,6 +8,11 @@ import {
   updateStatus,
   resetPassword,
   getUserPermissions,
+  assignProjectStaff,
+  removeProjectStaff,
+  getProjectStaff,
+  getAuditLogs,
+  getLoginHistory,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateRequest } from '../middlewares/validate.middleware';
@@ -20,12 +25,19 @@ router.use(authenticate);
 
 // Admin-only operations
 router.get('/', authorize(['Admin']), getUsers);
+router.get('/audit-logs', authorize(['Admin']), getAuditLogs);
+router.get('/login-history', authorize(['Admin']), getLoginHistory);
 router.post('/', authorize(['Admin']), validateRequest(registerSchema), createUser);
+router.post('/assign', authorize(['Admin']), assignProjectStaff);
+router.post('/remove-assignment', authorize(['Admin']), removeProjectStaff);
 router.put('/:id', authorize(['Admin']), updateUser);
 router.delete('/:id', authorize(['Admin']), deleteUser);
 
 router.patch('/status', authorize(['Admin']), updateStatus);
 router.patch('/reset-password', authorize(['Admin']), resetPassword);
+
+// Project staff retrieval
+router.get('/project/:projectId', getProjectStaff);
 
 // Shared operation: Get user's own merged permissions list
 router.get('/permissions', getUserPermissions);

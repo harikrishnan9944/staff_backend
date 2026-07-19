@@ -45,13 +45,13 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
     if (status && status !== 'All') {
       query.status = status;
     }
-    if (vendor && vendor !== 'All') {
+    if (vendor && vendor !== 'All' && vendor !== 'undefined' && vendor !== 'null') {
       query.vendorId = vendor;
     }
-    if (project && project !== 'All') {
+    if (project && project !== 'All' && project !== 'undefined' && project !== 'null') {
       query.projectId = project;
     }
-    if (materialId) {
+    if (materialId && materialId !== 'undefined' && materialId !== 'null') {
       query.materialId = materialId;
     }
 

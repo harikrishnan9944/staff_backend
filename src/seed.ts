@@ -8,6 +8,7 @@ import { Vendor } from './models/vendor.model';
 import { Payment } from './models/payment.model';
 import { DocumentFile } from './models/document.model';
 import { CompanySettings } from './models/settings.model';
+import { ProjectMember } from './models/projectMember.model';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
@@ -28,10 +29,24 @@ const seedDB = async () => {
     await Payment.deleteMany({});
     await DocumentFile.deleteMany({});
     await CompanySettings.deleteMany({});
+    await ProjectMember.deleteMany({});
     console.log('Cleared existing collections successfully.');
 
     // 2. Seed Users
     console.log('Seeding users...');
+    const adminUser = await User.create({
+      name: 'Administrator',
+      username: 'admin',
+      password: 'password123',
+      role: 'Admin',
+      email: 'admin@construction.com',
+      phone: '+15550000',
+      profileImage: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=256&h=256&fit=crop',
+      isActive: true,
+      employeeId: 'EMP-0001',
+      department: 'Administration & IT',
+    });
+
     const architectUser = await User.create({
       name: 'Marcus Stone',
       username: 'architect',
@@ -138,7 +153,7 @@ const seedDB = async () => {
       progress: 45,
       stage: 'Foundation',
       status: 'Active',
-      assignedUsers: [architectUser._id, managerUser._id, supervisorUser._id, purchaserUser._id],
+      assignedUsers: [opsHeadUser._id, managerUser._id, purchaserUser._id, supervisorUser._id, architectUser._id, accountantUser._id],
     });
 
     const project2 = await Project.create({
@@ -147,10 +162,59 @@ const seedDB = async () => {
       progress: 85,
       stage: 'Finishing',
       status: 'Active',
-      assignedUsers: [architectUser._id, managerUser._id, supervisorUser._id],
+      assignedUsers: [managerUser._id, supervisorUser._id, architectUser._id],
     });
 
     console.log('Seeded projects');
+
+    console.log('Seeding project members...');
+    await ProjectMember.create([
+      {
+        projectId: project1._id,
+        userId: opsHeadUser._id,
+        role: 'Operation Head',
+      },
+      {
+        projectId: project1._id,
+        userId: managerUser._id,
+        role: 'Project Manager',
+      },
+      {
+        projectId: project1._id,
+        userId: purchaserUser._id,
+        role: 'Purchaser',
+      },
+      {
+        projectId: project1._id,
+        userId: supervisorUser._id,
+        role: 'Supervisor',
+      },
+      {
+        projectId: project1._id,
+        userId: architectUser._id,
+        role: 'Architect',
+      },
+      {
+        projectId: project1._id,
+        userId: accountantUser._id,
+        role: 'Accountant',
+      },
+      {
+        projectId: project2._id,
+        userId: managerUser._id,
+        role: 'Project Manager',
+      },
+      {
+        projectId: project2._id,
+        userId: supervisorUser._id,
+        role: 'Supervisor',
+      },
+      {
+        projectId: project2._id,
+        userId: architectUser._id,
+        role: 'Architect',
+      },
+    ]);
 
     // 5. Seed Materials
     console.log('Seeding materials...');

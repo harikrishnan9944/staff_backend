@@ -15,6 +15,8 @@ export interface IUser extends Document {
   permissions: string[];
   employeeId?: string;
   department?: string;
+  joiningDate?: Date;
+  remarks?: string;
   twoFactorEnabled?: boolean;
   loginHistory?: Array<{
     timestamp: Date;
@@ -102,6 +104,14 @@ const UserSchema = new Schema<IUser>(
     department: {
       type: String,
       trim: true,
+    },
+    joiningDate: {
+      type: Date,
+    },
+    remarks: {
+      type: String,
+      trim: true,
+      default: '',
     },
     twoFactorEnabled: {
       type: Boolean,

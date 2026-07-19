@@ -2,11 +2,15 @@ import { Response } from 'express';
 import { Project } from '../models/project.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { Purchase } from '../models/purchase.model';
+import { ProjectMember } from '../models/projectMember.model';
 
 // Helper to filter projects query by role assignment
-const getProjectQueryByRole = (userId: string, role: string) => {
+const getProjectQueryByRole = async (userId: string, role: string) => {
   const isAdminOrOperations = ['Admin', 'Head of Operations', 'Manager'].includes(role);
-  return isAdminOrOperations ? {} : { assignedUsers: userId };
+  if (isAdminOrOperations) return {};
+  const memberships = await ProjectMember.find({ userId });
+  const projectIds = memberships.map(m => m.projectId);
+  return { _id: { $in: projectIds } };
 };
 
 // GET /api/dashboard/summary
@@ -23,7 +27,7 @@ export const getDashboardSummary = async (req: AuthRequest, res: Response): Prom
     const role = user.role;
 
     // 1. Projects statistics
-    const projectQuery = getProjectQueryByRole(userId, role);
+    const projectQuery = await getProjectQueryByRole(userId, role);
     const totalProjects = await Project.countDocuments(projectQuery);
     const activeProjects = await Project.countDocuments({ ...projectQuery, status: 'Active' });
     const completedProjects = await Project.countDocuments({ ...projectQuery, status: 'Completed' });
@@ -92,7 +96,7 @@ export const getAnalyticsData = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const projectQuery = getProjectQueryByRole(user._id.toString(), user.role);
+    const projectQuery = await getProjectQueryByRole(user._id.toString(), user.role);
 
     // Projects by status distribution
     const active = await Project.countDocuments({ ...projectQuery, status: 'Active' });

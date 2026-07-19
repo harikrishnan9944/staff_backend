@@ -11,7 +11,7 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
     const { materialId } = req.query;
     
     const query: any = {};
-    if (materialId) {
+    if (materialId && materialId !== 'undefined' && materialId !== 'null') {
       query.materialId = materialId;
     }
 
