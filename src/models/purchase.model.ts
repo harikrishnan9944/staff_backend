@@ -126,7 +126,7 @@ const PurchaseSchema = new Schema<IPurchase>(
 );
 
 // Indexes for query speed
-PurchaseSchema.index({ purchaseOrderNumber: 1 });
 PurchaseSchema.index({ projectId: 1 });
+PurchaseSchema.index({ createdAt: 1 }, { expireAfterSeconds: 40 * 24 * 60 * 60 });
 
 export const Purchase = model<IPurchase>('Purchase', PurchaseSchema);

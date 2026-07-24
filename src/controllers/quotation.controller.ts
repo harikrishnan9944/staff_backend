@@ -40,10 +40,24 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
 // POST /api/quotations
 export const createQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { materialId, vendor, amount, description } = req.body;
+    const { materialId, vendor, amount, description, quotationImage } = req.body;
 
     if (!materialId || !vendor || amount === undefined) {
       res.status(400).json({ success: false, message: 'Required fields are missing' });
+      return;
+    }
+
+    const material = await Material.findById(materialId);
+    if (!material) {
+      res.status(404).json({ success: false, message: 'Material request not found' });
+      return;
+    }
+
+    if (material.status === 'Registered') {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Material request must be sectioned by the Architect before adding quotations.' 
+      });
       return;
     }
 
@@ -53,6 +67,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       amount,
       description,
       status: 'Pending',
+      quotationImage: quotationImage || '',
     });
 
     // Transition Material status to 'Quotation Set'
@@ -73,7 +88,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
 export const updateQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { vendor, amount, description, status } = req.body;
+    const { vendor, amount, description, status, quotationImage } = req.body;
 
     const quotation = await Quotation.findById(id);
     if (!quotation) {
@@ -84,6 +99,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     if (vendor !== undefined) quotation.vendor = vendor;
     if (amount !== undefined) quotation.amount = amount;
     if (description !== undefined) quotation.description = description;
+    if (quotationImage !== undefined) quotation.quotationImage = quotationImage;
 
     // Handle quote approval
     if (status !== undefined) {

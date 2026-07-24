@@ -10,8 +10,8 @@ export const checkProjectAccess = async (req: AuthRequest, res: Response, next: 
       return;
     }
 
-    // Admins have override access to all projects
-    if (user.role === 'Admin') {
+    // Admins, Head of Operations, and Managers have override access to all projects
+    if (user.role === 'Admin' || user.role === 'Head of Operations' || user.role === 'Manager') {
       next();
       return;
     }

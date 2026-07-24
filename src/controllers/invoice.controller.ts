@@ -106,7 +106,7 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
     } = req.body;
     const user = req.user;
 
-    if (!invoiceNumber || !purchaseId || !invoiceDate || invoiceAmount === undefined || gstAmount === undefined || !files || files.length === 0) {
+    if (!invoiceNumber || !purchaseId || !invoiceDate || invoiceAmount === undefined || gstAmount === undefined) {
       res.status(400).json({ success: false, message: 'Required fields are missing' });
       return;
     }
@@ -125,10 +125,13 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Upload files to Cloudinary (using base64 strings)
-    console.log(`Uploading ${files.length} invoice files to Cloudinary...`);
-    const uploadPromises = files.map((fileBase64: string) => uploadToCloudinary(fileBase64));
-    const invoiceUrls = await Promise.all(uploadPromises);
+    // Upload files to Cloudinary (using base64 strings) if provided
+    let invoiceUrls: string[] = [];
+    if (files && files.length > 0) {
+      console.log(`Uploading ${files.length} invoice files to Cloudinary...`);
+      const uploadPromises = files.map((fileBase64: string) => uploadToCloudinary(fileBase64));
+      invoiceUrls = await Promise.all(uploadPromises);
+    }
 
     const totalAmount = Number(invoiceAmount) + Number(gstAmount);
 

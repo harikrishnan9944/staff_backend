@@ -7,6 +7,7 @@ export interface IQuotation extends Document {
   description?: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   createdDate: string;
+  quotationImage?: string;
 }
 
 const QuotationSchema = new Schema<IQuotation>(
@@ -39,10 +40,16 @@ const QuotationSchema = new Schema<IQuotation>(
       type: String,
       default: () => new Date().toISOString().split('T')[0],
     },
+    quotationImage: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,
   }
 );
+
+QuotationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 40 * 24 * 60 * 60 });
 
 export const Quotation = model<IQuotation>('Quotation', QuotationSchema);

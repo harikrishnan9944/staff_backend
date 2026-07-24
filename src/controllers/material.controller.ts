@@ -165,6 +165,8 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       remarks,
       assignedUser,
       materialImage,
+      purchaseDeadline,
+      section,
     } = req.body;
     const user = req.user;
 
@@ -187,7 +189,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       status: status || 'Registered',
       assignedUser,
       materialImage: materialImage || '',
+      purchaseDeadline: purchaseDeadline || '',
       remarks: remarks || '',
+      section: section || '',
       createdBy: user?._id,
       createdByRole: user?.role || 'Architect',
     });
@@ -251,6 +255,8 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.assignedUser !== undefined) material.assignedUser = updates.assignedUser;
     if (updates.materialImage !== undefined) material.materialImage = updates.materialImage;
     if (updates.remarks !== undefined) material.remarks = updates.remarks;
+    if (updates.purchaseDeadline !== undefined) material.purchaseDeadline = updates.purchaseDeadline;
+    if (updates.section !== undefined) material.section = updates.section;
 
     // Log last editor metrics
     material.lastUpdatedBy = user._id;

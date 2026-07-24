@@ -3,6 +3,13 @@ import { Project } from '../models/project.model';
 import { ProjectMember } from '../models/projectMember.model';
 import { User } from '../models/user.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { Material } from '../models/material.model';
+import { Quotation } from '../models/quotation.model';
+import { Purchase } from '../models/purchase.model';
+import { Invoice } from '../models/invoice.model';
+import { Payment } from '../models/payment.model';
+import { DocumentFile } from '../models/document.model';
+import { MaterialWorkflow } from '../models/workflow.model';
 
 // GET /api/projects
 export const getProjects = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -13,8 +20,13 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
     // Filter projects by assignment for non-Admin roles
     if (user && user.role !== 'Admin') {
       const memberships = await ProjectMember.find({ userId: user._id });
-      const projectIds = memberships.map(m => m.projectId);
-      query._id = { $in: projectIds };
+      const memberProjectIds = memberships.map(m => m.projectId.toString());
+      
+      const directProjects = await Project.find({ assignedUsers: user._id });
+      const directProjectIds = directProjects.map(p => p._id.toString());
+      
+      const uniqueProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
+      query._id = { $in: uniqueProjectIds };
     }
 
     const projects = await Project.find(query).sort({ createdAt: -1 });
@@ -51,10 +63,15 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
 // POST /api/projects
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, clientName, location, startDate, expectedEndDate, status, remarks, assignedUsers } = req.body;
+    const { name, clientName, location, startDate, expectedEndDate, status, remarks, assignedUsers, deletePassword } = req.body;
 
     if (!name || !clientName || !location) {
       res.status(400).json({ success: false, message: 'Name, clientName and location are required' });
+      return;
+    }
+
+    if (!deletePassword) {
+      res.status(400).json({ success: false, message: 'Delete warning password is required' });
       return;
     }
 
@@ -83,6 +100,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
       remarks: remarks || '',
       stage: 'Planning',
       assignedUsers: assignedUsers || [],
+      deletePassword,
     });
 
     if (assignedUsers && Array.isArray(assignedUsers)) {
@@ -116,7 +134,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
 export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, clientName, location, startDate, expectedEndDate, status, remarks, progress, assignedUsers } = req.body;
+    const { name, clientName, location, startDate, expectedEndDate, status, remarks, progress, assignedUsers, deletePassword } = req.body;
 
     const project = await Project.findById(id);
     if (!project) {
@@ -171,6 +189,9 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     if (status !== undefined) project.status = status;
     if (remarks !== undefined) project.remarks = remarks;
     if (progress !== undefined) project.progress = progress;
+    if (deletePassword !== undefined && deletePassword !== '') {
+      project.deletePassword = deletePassword;
+    }
 
     await project.save();
 
@@ -192,13 +213,53 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
 export const deleteProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const { deletePassword } = req.body;
+    const deletePasswordVal = deletePassword || req.headers['x-delete-password'] || req.query.deletePassword;
 
-    const project = await Project.findById(id);
+    if (!deletePasswordVal) {
+      res.status(400).json({ success: false, message: 'Delete warning password is required to delete this project.' });
+      return;
+    }
+
+    const project = await Project.findById(id).select('+deletePassword');
     if (!project) {
       res.status(404).json({ success: false, message: 'Project not found' });
       return;
     }
 
+    const isMatch = await project.compareDeletePassword(deletePasswordVal as string);
+    if (!isMatch) {
+      res.status(400).json({ success: false, message: 'Incorrect delete warning password. Project not deleted.' });
+      return;
+    }
+
+    // 1. Delete all project members
+    await ProjectMember.deleteMany({ projectId: id });
+
+    // 2. Find and delete all project materials and their linked quotations
+    const materials = await Material.find({ projectId: id });
+    const materialIds = materials.map(m => m._id);
+    if (materialIds.length > 0) {
+      await Quotation.deleteMany({ materialId: { $in: materialIds } });
+    }
+    await Material.deleteMany({ projectId: id });
+
+    // 3. Delete purchases
+    await Purchase.deleteMany({ projectId: id });
+
+    // 4. Delete invoices
+    await Invoice.deleteMany({ projectId: id });
+
+    // 5. Delete payments
+    await Payment.deleteMany({ projectId: id });
+
+    // 6. Delete documents
+    await DocumentFile.deleteMany({ projectId: id });
+
+    // 7. Delete workflows
+    await MaterialWorkflow.deleteMany({ projectId: id });
+
+    // 8. Delete the project itself
     await Project.findByIdAndDelete(id);
 
     res.status(200).json({

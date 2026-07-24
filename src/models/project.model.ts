@@ -1,4 +1,5 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 export interface IProject extends Document {
   name: string;
@@ -11,8 +12,10 @@ export interface IProject extends Document {
   stage: 'Planning' | 'Foundation' | 'Framing' | 'Electrical & Plumbing' | 'Finishing' | string;
   status: 'Active' | 'Completed' | 'Suspended' | 'Planning' | 'Finishing';
   remarks?: string;
+  deletePassword?: string;
   createdAt: Date;
   updatedAt: Date;
+  compareDeletePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const ProjectSchema = new Schema<IProject>(
@@ -65,10 +68,41 @@ const ProjectSchema = new Schema<IProject>(
       type: String,
       default: '',
     },
+    deletePassword: {
+      type: String,
+      select: false,
+    },
   },
   {
     timestamps: true,
   }
 );
 
+// Pre-save hook to hash delete password
+ProjectSchema.pre('save', async function (next) {
+  const project = this as any;
+
+  if (!project.isModified('deletePassword') || !project.deletePassword) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    project.deletePassword = await bcrypt.hash(project.deletePassword, salt);
+    next();
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+// Compare delete password method
+ProjectSchema.methods.compareDeletePassword = async function (candidatePassword: string): Promise<boolean> {
+  if (!this.deletePassword) {
+    // Fallback for legacy projects
+    return candidatePassword === 'delete123';
+  }
+  return bcrypt.compare(candidatePassword, this.deletePassword);
+};
+
 export const Project = model<IProject>('Project', ProjectSchema);
+

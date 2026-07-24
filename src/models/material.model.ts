@@ -11,10 +11,12 @@ export interface IMaterial extends Document {
   estimatedCost: number;
   vendorId?: Types.ObjectId;
   priority: 'High' | 'Medium' | 'Low';
-  status: 'Registered' | 'Quotation Set' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
+  status: 'Registered' | 'Sectioned' | 'Quotation Set' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
   assignedUser?: Types.ObjectId;
   materialImage?: string;
+  purchaseDeadline?: string;
   remarks?: string;
+  section?: string;
   createdBy: Types.ObjectId;
   createdByRole?: string;
   lastUpdatedBy?: Types.ObjectId;
@@ -76,9 +78,14 @@ const MaterialSchema = new Schema<IMaterial>(
       enum: ['High', 'Medium', 'Low'],
       default: 'Medium',
     },
+    section: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     status: {
       type: String,
-      enum: ['Registered', 'Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded', 'Cancelled'],
+      enum: ['Registered', 'Sectioned', 'Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded', 'Cancelled'],
       default: 'Registered',
     },
     assignedUser: {
@@ -86,6 +93,10 @@ const MaterialSchema = new Schema<IMaterial>(
       ref: 'User',
     },
     materialImage: {
+      type: String,
+      default: '',
+    },
+    purchaseDeadline: {
       type: String,
       default: '',
     },
@@ -119,5 +130,6 @@ const MaterialSchema = new Schema<IMaterial>(
 
 // Compound index for search performance
 MaterialSchema.index({ categoryId: 1, materialName: 1 });
+MaterialSchema.index({ createdAt: 1 }, { expireAfterSeconds: 40 * 24 * 60 * 60 });
 
 export const Material = model<IMaterial>('Material', MaterialSchema);

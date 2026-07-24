@@ -61,7 +61,8 @@ export const authorize = (roles: string[]) => {
       return;
     }
 
-    if (!roles.includes(req.user.role)) {
+    const superRoles = ['Admin', 'Head of Operations', 'Manager'];
+    if (!superRoles.includes(req.user.role) && !roles.includes(req.user.role)) {
       res.status(430).json({
         success: false,
         message: `Forbidden: Role '${req.user.role}' is not authorized to access this resource`,
@@ -93,23 +94,10 @@ export const requirePermissions = (requiredPermissions: string[]) => {
           'view_profile',
         ],
         'Head of Operations': [
-          'view_dashboard',
-          'view_projects',
-          'select_materials',
-          'manage_quotations',
-          'approve_workflow',
-          'view_reports',
-          'view_profile',
+          'all',
         ],
         'Manager': [
-          'view_dashboard',
-          'view_projects',
-          'manage_materials',
-          'manage_quotations',
-          'manage_workflow',
-          'create_comments',
-          'view_reports',
-          'view_profile',
+          'all',
         ],
         'Supervisor': [
           'view_dashboard',

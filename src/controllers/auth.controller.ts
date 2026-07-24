@@ -138,11 +138,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Fetch assigned projects
     let assignedProjects = [];
-    if (user.role === 'Admin') {
+    if (user.role === 'Admin' || user.role === 'Head of Operations' || user.role === 'Manager') {
       const allProjects = await Project.find({ status: 'Active' });
       assignedProjects = allProjects.map(p => ({
         projectId: p,
-        role: 'Admin'
+        role: user.role
       }));
     } else {
       const assignments = await ProjectMember.find({ userId: user._id })

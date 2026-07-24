@@ -325,11 +325,8 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
 
     // 1. PO State Transitions Guards
     if (status && status !== purchase.status) {
-      if (role === 'Admin') {
+      if (role === 'Admin' || role === 'Head of Operations' || role === 'Manager') {
         allowed = true;
-      } 
-      else if (role === 'Head of Operations' && status === 'Approved' && purchase.status === 'Ordered') {
-        allowed = true; // Operations Head can approve POs that are ordered
       } 
       else if (role === 'Purchase Supervisor' && status === 'Ordered' && purchase.status === 'Draft') {
         allowed = true; // Purchase Supervisor can change Draft to Ordered
@@ -338,8 +335,8 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
         allowed = true; // Completed once delivered
       } 
       else if (status === 'Cancelled' && ['Draft', 'Ordered'].includes(purchase.status)) {
-        // Purchase Supervisor or Manager can cancel pending orders
-        if (role === 'Purchase Supervisor' || role === 'Manager') {
+        // Purchase Supervisor can cancel pending orders (Manager/Admin/Ops Head are already allowed above)
+        if (role === 'Purchase Supervisor') {
           allowed = true;
         }
       }
@@ -373,7 +370,7 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
 
     // 2. Accountant Payment Status Updates
     if (paymentStatus && paymentStatus !== purchase.paymentStatus) {
-      if (role === 'Accountant' || role === 'Admin') {
+      if (role === 'Accountant' || role === 'Admin' || role === 'Head of Operations' || role === 'Manager') {
         purchase.paymentStatus = paymentStatus;
         actionLog = (actionLog ? actionLog + ', ' : '') + `Updated Payment Status to '${paymentStatus}'`;
         

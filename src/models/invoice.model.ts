@@ -74,11 +74,7 @@ const InvoiceSchema = new Schema<IInvoice>(
     },
     invoiceFiles: {
       type: [String],
-      required: [true, 'Invoice attachment file is required'],
-      validate: [
-        (val: string[]) => val.length > 0,
-        'At least one invoice file attachment is required',
-      ],
+      default: [],
     },
     verificationStatus: {
       type: String,
@@ -105,7 +101,6 @@ const InvoiceSchema = new Schema<IInvoice>(
 );
 
 // Indexes
-InvoiceSchema.index({ invoiceNumber: 1 });
 InvoiceSchema.index({ purchaseId: 1 });
 
 export const Invoice = model<IInvoice>('Invoice', InvoiceSchema);

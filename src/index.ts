@@ -39,7 +39,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+  });
   next();
 });
 

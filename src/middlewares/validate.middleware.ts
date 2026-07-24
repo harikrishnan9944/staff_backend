@@ -14,6 +14,7 @@ export const validateRequest = (schema: ZodSchema) => {
           return acc;
         }, {});
 
+        console.log('Validation failed:', formattedErrors);
         res.status(400).json({
           success: false,
           message: 'Validation failed',

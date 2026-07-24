@@ -154,6 +154,7 @@ const seedDB = async () => {
       stage: 'Foundation',
       status: 'Active',
       assignedUsers: [opsHeadUser._id, managerUser._id, purchaserUser._id, supervisorUser._id, architectUser._id, accountantUser._id],
+      deletePassword: 'delete123',
     });
 
     const project2 = await Project.create({
@@ -163,6 +164,37 @@ const seedDB = async () => {
       stage: 'Finishing',
       status: 'Active',
       assignedUsers: [managerUser._id, supervisorUser._id, architectUser._id],
+      deletePassword: 'delete123',
+    });
+
+    const project3 = await Project.create({
+      name: 'Greenwood Apartments',
+      location: 'Greenwood Road, Portland',
+      progress: 20,
+      stage: 'Foundation',
+      status: 'Active',
+      assignedUsers: [opsHeadUser._id, supervisorUser._id, architectUser._id],
+      deletePassword: 'delete123',
+    });
+
+    const project4 = await Project.create({
+      name: 'Skyline Heights',
+      location: 'Summit Boulevard, Denver',
+      progress: 65,
+      stage: 'Framing',
+      status: 'Active',
+      assignedUsers: [managerUser._id, purchaserUser._id, accountantUser._id],
+      deletePassword: 'delete123',
+    });
+
+    const project5 = await Project.create({
+      name: 'Oceanfront Condos',
+      location: 'Coastal Highway, Miami',
+      progress: 10,
+      stage: 'Planning',
+      status: 'Planning',
+      assignedUsers: [opsHeadUser._id, managerUser._id, supervisorUser._id],
+      deletePassword: 'delete123',
     });
 
     console.log('Seeded projects');
@@ -213,6 +245,51 @@ const seedDB = async () => {
         projectId: project2._id,
         userId: architectUser._id,
         role: 'Architect',
+      },
+      {
+        projectId: project3._id,
+        userId: opsHeadUser._id,
+        role: 'Operation Head',
+      },
+      {
+        projectId: project3._id,
+        userId: supervisorUser._id,
+        role: 'Supervisor',
+      },
+      {
+        projectId: project3._id,
+        userId: architectUser._id,
+        role: 'Architect',
+      },
+      {
+        projectId: project4._id,
+        userId: managerUser._id,
+        role: 'Project Manager',
+      },
+      {
+        projectId: project4._id,
+        userId: purchaserUser._id,
+        role: 'Purchaser',
+      },
+      {
+        projectId: project4._id,
+        userId: accountantUser._id,
+        role: 'Accountant',
+      },
+      {
+        projectId: project5._id,
+        userId: opsHeadUser._id,
+        role: 'Operation Head',
+      },
+      {
+        projectId: project5._id,
+        userId: managerUser._id,
+        role: 'Project Manager',
+      },
+      {
+        projectId: project5._id,
+        userId: supervisorUser._id,
+        role: 'Supervisor',
       },
     ]);
 
