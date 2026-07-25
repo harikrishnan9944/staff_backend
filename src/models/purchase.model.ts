@@ -12,6 +12,7 @@ export interface IPurchase extends Document {
   gst: number;
   discount: number;
   finalAmount: number;
+  transactionFees?: number;
   purchaseDate: Date;
   expectedDeliveryDate: Date;
   actualDeliveryDate?: Date;
@@ -79,6 +80,11 @@ const PurchaseSchema = new Schema<IPurchase>(
       type: Number,
       required: true,
       min: [0, 'Final amount cannot be negative'],
+    },
+    transactionFees: {
+      type: Number,
+      default: 0,
+      min: [0, 'Transaction fees cannot be negative'],
     },
     purchaseDate: {
       type: Date,

@@ -103,16 +103,48 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
 
     // Handle quote approval
     if (status !== undefined) {
+      // Authorization Check
+      if (status === 'Selected') {
+        if (req.user?.role !== 'Architect' && !['Admin', 'Manager', 'Head of Operations'].includes(req.user?.role || '')) {
+          res.status(403).json({ success: false, message: 'Only Architects or Managers/Admins can select quotations' });
+          return;
+        }
+      } else if (status === 'Approved' || status === 'Rejected') {
+        if (!['Admin', 'Manager', 'Head of Operations'].includes(req.user?.role || '')) {
+          res.status(403).json({ success: false, message: 'You do not have permission to approve/reject quotations' });
+          return;
+        }
+      }
+
       quotation.status = status;
-      if (status === 'Approved') {
+
+      if (status === 'Selected') {
+        // Automatically set any other 'Selected' quote for the same material back to 'Pending'
+        await Quotation.updateMany(
+          { materialId: quotation.materialId, status: 'Selected', _id: { $ne: quotation._id } },
+          { status: 'Pending' }
+        );
+
+        // Update parent Material last updated details
+        await Material.findByIdAndUpdate(quotation.materialId, {
+          lastUpdatedBy: req.user?._id,
+          lastUpdatedByRole: req.user?.role,
+          lastUpdatedDate: new Date(),
+        });
+      } else if (status === 'Approved') {
         // Automatically reject all other quotes for the same material
         await Quotation.updateMany(
           { materialId: quotation.materialId, _id: { $ne: quotation._id } },
           { status: 'Rejected' }
         );
 
-        // Transition Material status to 'Quotation Approved'
-        await Material.findByIdAndUpdate(quotation.materialId, { status: 'Quotation Approved' });
+        // Transition Material status to 'Quotation Approved' and update last editor metrics
+        await Material.findByIdAndUpdate(quotation.materialId, {
+          status: 'Quotation Approved',
+          lastUpdatedBy: req.user?._id,
+          lastUpdatedByRole: req.user?.role,
+          lastUpdatedDate: new Date(),
+        });
 
         // Update MaterialWorkflow stage to 'Purchase'
         await MaterialWorkflow.findOneAndUpdate(

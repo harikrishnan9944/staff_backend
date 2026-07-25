@@ -5,7 +5,7 @@ export interface IQuotation extends Document {
   vendor: string;
   amount: number;
   description?: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'Selected' | 'Approved' | 'Rejected';
   createdDate: string;
   quotationImage?: string;
 }
@@ -33,7 +33,7 @@ const QuotationSchema = new Schema<IQuotation>(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Approved', 'Rejected'],
+      enum: ['Pending', 'Selected', 'Approved', 'Rejected'],
       default: 'Pending',
     },
     createdDate: {

@@ -14,7 +14,7 @@ router.use(authenticate);
 
 router.get('/', getQuotations);
 router.post('/', createQuotation);
-router.put('/:id', authorize(['Admin', 'Head of Operations', 'Manager']), updateQuotation);
+router.put('/:id', authorize(['Admin', 'Head of Operations', 'Manager', 'Architect']), updateQuotation);
 router.delete('/:id', deleteQuotation);
 
 export default router;

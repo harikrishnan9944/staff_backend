@@ -132,6 +132,7 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
       .populate('categoryId', 'name color')
       .populate('assignedUser', 'name username profileImage role')
       .populate('createdBy', 'name username')
+      .populate('lastUpdatedBy', 'name username')
       .populate('projectId', 'name')
       .sort(sortOption);
 
@@ -194,6 +195,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       section: section || '',
       createdBy: user?._id,
       createdByRole: user?.role || 'Architect',
+      lastUpdatedBy: user?._id,
+      lastUpdatedByRole: user?.role || 'Architect',
+      lastUpdatedDate: new Date(),
     });
 
     // Auto-sync Quotation & Purchase records if status requires them
@@ -209,7 +213,8 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
     const populatedMaterial = await Material.findById(material._id)
       .populate('categoryId', 'name color')
       .populate('assignedUser', 'name username profileImage')
-      .populate('createdBy', 'name username');
+      .populate('createdBy', 'name username')
+      .populate('lastUpdatedBy', 'name username');
 
     res.status(201).json({
       success: true,

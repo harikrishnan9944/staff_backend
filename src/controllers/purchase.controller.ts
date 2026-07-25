@@ -126,6 +126,7 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
       purchaseAmount,
       gst,
       discount,
+      transactionFees,
       purchaseDate,
       expectedDeliveryDate,
       remarks,
@@ -140,7 +141,8 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
 
     const computedGST = gst || 0;
     const computedDiscount = discount || 0;
-    const finalAmount = Number(purchaseAmount) + Number(computedGST) - Number(computedDiscount);
+    const computedFees = transactionFees || 0;
+    const finalAmount = Number(purchaseAmount) + Number(computedGST) - Number(computedDiscount) + Number(computedFees);
 
     // Auto generate PO number
     const purchaseOrderNumber = await generatePONumber();
@@ -156,6 +158,7 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
       purchaseAmount,
       gst: computedGST,
       discount: computedDiscount,
+      transactionFees: computedFees,
       finalAmount,
       purchaseDate: purchaseDate || new Date(),
       expectedDeliveryDate: expectedDeliveryDate || new Date(),
@@ -209,6 +212,7 @@ export const updatePurchase = async (req: AuthRequest, res: Response): Promise<v
       purchaseAmount,
       gst,
       discount,
+      transactionFees,
       expectedDeliveryDate,
       remarks,
       attachments,
@@ -233,12 +237,13 @@ export const updatePurchase = async (req: AuthRequest, res: Response): Promise<v
     if (purchaseAmount !== undefined) purchase.purchaseAmount = purchaseAmount;
     if (gst !== undefined) purchase.gst = gst;
     if (discount !== undefined) purchase.discount = discount;
+    if (transactionFees !== undefined) purchase.transactionFees = transactionFees;
     if (expectedDeliveryDate) purchase.expectedDeliveryDate = expectedDeliveryDate;
     if (remarks !== undefined) purchase.remarks = remarks;
     if (attachments !== undefined) purchase.attachments = attachments;
 
     // Recompute final amount
-    purchase.finalAmount = Number(purchase.purchaseAmount) + Number(purchase.gst) - Number(purchase.discount);
+    purchase.finalAmount = Number(purchase.purchaseAmount) + Number(purchase.gst) - Number(purchase.discount) + Number(purchase.transactionFees || 0);
 
     await purchase.save();
 

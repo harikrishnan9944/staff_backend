@@ -165,8 +165,13 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
       { status: 'Invoice Uploaded', currentStage: 'Invoice Upload', progress: 85 }
     );
 
-    // Transition Material status to 'Bill Uploaded'
-    await Material.findByIdAndUpdate(purchase.materialId, { status: 'Bill Uploaded' });
+    // Transition Material status to 'Bill Uploaded' and set editor metrics
+    await Material.findByIdAndUpdate(purchase.materialId, {
+      status: 'Bill Uploaded',
+      lastUpdatedBy: user?._id,
+      lastUpdatedByRole: user?.role,
+      lastUpdatedDate: new Date(),
+    });
 
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate('projectId', 'name')
