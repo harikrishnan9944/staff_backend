@@ -53,7 +53,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    if (material.status === 'Registered') {
+    if (['Registered', 'Material Selection', 'Material Approve'].includes(material.status)) {
       res.status(400).json({ 
         success: false, 
         message: 'Material request must be sectioned by the Architect before adding quotations.' 
