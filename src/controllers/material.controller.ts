@@ -176,6 +176,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    const initialStatus = status || 'Registered';
     const material = await Material.create({
       projectId,
       categoryId: categoryId || undefined,
@@ -187,7 +188,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       estimatedCost: estimatedCost !== undefined ? estimatedCost : 0,
       vendorId,
       priority: priority || 'Medium',
-      status: status || 'Registered',
+      status: initialStatus,
       assignedUser,
       materialImage: materialImage || '',
       purchaseDeadline: purchaseDeadline || '',
@@ -198,6 +199,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       lastUpdatedBy: user?._id,
       lastUpdatedByRole: user?.role || 'Architect',
       lastUpdatedDate: new Date(),
+      sectionedDate: (initialStatus === 'Sectioned' || initialStatus === 'Material Selection' || initialStatus === 'Material Approve') ? new Date() : undefined,
+      selectionDate: (initialStatus === 'Material Selection' || initialStatus === 'Material Approve') ? new Date() : undefined,
+      approvalDate: (initialStatus === 'Material Approve') ? new Date() : undefined,
     });
 
     // Auto-sync Quotation & Purchase records if status requires them
@@ -256,7 +260,16 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.estimatedCost !== undefined) material.estimatedCost = updates.estimatedCost;
     if (updates.vendorId !== undefined) material.vendorId = updates.vendorId;
     if (updates.priority !== undefined) material.priority = updates.priority;
-    if (updates.status !== undefined) material.status = updates.status;
+    if (updates.status !== undefined) {
+      material.status = updates.status;
+      if (updates.status === 'Sectioned') {
+        (material as any).sectionedDate = new Date();
+      } else if (updates.status === 'Material Selection') {
+        (material as any).selectionDate = new Date();
+      } else if (updates.status === 'Material Approve') {
+        (material as any).approvalDate = new Date();
+      }
+    }
     if (updates.assignedUser !== undefined) material.assignedUser = updates.assignedUser;
     if (updates.materialImage !== undefined) material.materialImage = updates.materialImage;
     if (updates.remarks !== undefined) material.remarks = updates.remarks;

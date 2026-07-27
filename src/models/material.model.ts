@@ -22,6 +22,9 @@ export interface IMaterial extends Document {
   lastUpdatedBy?: Types.ObjectId;
   lastUpdatedByRole?: string;
   lastUpdatedDate?: Date;
+  sectionedDate?: Date;
+  selectionDate?: Date;
+  approvalDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -120,6 +123,15 @@ const MaterialSchema = new Schema<IMaterial>(
       type: String,
     },
     lastUpdatedDate: {
+      type: Date,
+    },
+    sectionedDate: {
+      type: Date,
+    },
+    selectionDate: {
+      type: Date,
+    },
+    approvalDate: {
       type: Date,
     },
   },

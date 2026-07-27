@@ -68,7 +68,7 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
     const purchases = await Purchase.find(query)
       .populate('projectId', 'name')
       .populate('categoryId', 'name color')
-      .populate('materialId', 'materialName brand unit')
+      .populate('materialId', 'materialName brand unit materialImage')
       .populate('vendorId', 'name username')
       .populate('createdBy', 'name username')
       .sort(sortOption);
@@ -93,7 +93,7 @@ export const getPurchaseById = async (req: AuthRequest, res: Response): Promise<
     const purchase = await Purchase.findById(id)
       .populate('projectId', 'name location')
       .populate('categoryId', 'name color')
-      .populate('materialId', 'materialName brand description quantity unit estimatedCost')
+      .populate('materialId', 'materialName brand description quantity unit estimatedCost materialImage')
       .populate('vendorId', 'name username email phone profileImage')
       .populate('createdBy', 'name username');
 
@@ -188,7 +188,7 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
 
     const populatedPurchase = await Purchase.findById(purchase._id)
       .populate('projectId', 'name')
-      .populate('materialId', 'materialName')
+      .populate('materialId', 'materialName materialImage')
       .populate('vendorId', 'name');
 
     res.status(201).json({
@@ -256,7 +256,7 @@ export const updatePurchase = async (req: AuthRequest, res: Response): Promise<v
     const populatedPurchase = await Purchase.findById(id)
       .populate('projectId', 'name')
       .populate('vendorId', 'name')
-      .populate('materialId', 'materialName');
+      .populate('materialId', 'materialName materialImage');
 
     res.status(200).json({
       success: true,
