@@ -11,7 +11,7 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
     const status = material.status;
     const matId = material._id;
 
-    if (['Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status)) {
+    if (['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status)) {
       const existingQuote = await Quotation.findOne({ materialId: matId });
       if (!existingQuote) {
         await Quotation.create({
@@ -19,9 +19,9 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
           vendor: 'Vendor',
           amount: material.estimatedCost || (material.quantity * 10) || 0,
           description: material.description || material.remarks || 'Quotation record auto-generated',
-          status: ['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status) ? 'Approved' : 'Pending',
+          status: 'Approved',
         });
-      } else if (['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status) && existingQuote.status !== 'Approved') {
+      } else if (existingQuote.status !== 'Approved') {
         existingQuote.status = 'Approved';
         await existingQuote.save();
       }
@@ -176,7 +176,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const initialStatus = status || 'Registered';
+    const initialStatus = status || 'Material Selection';
     const material = await Material.create({
       projectId,
       categoryId: categoryId || undefined,
@@ -199,9 +199,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       lastUpdatedBy: user?._id,
       lastUpdatedByRole: user?.role || 'Architect',
       lastUpdatedDate: new Date(),
-      sectionedDate: (initialStatus === 'Sectioned' || initialStatus === 'Material Selection' || initialStatus === 'Material Approve') ? new Date() : undefined,
-      selectionDate: (initialStatus === 'Material Selection' || initialStatus === 'Material Approve') ? new Date() : undefined,
-      approvalDate: (initialStatus === 'Material Approve') ? new Date() : undefined,
+      sectionedDate: ['Material Approve', 'Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
+      selectionDate: new Date(),
+      approvalDate: ['Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
     });
 
     // Auto-sync Quotation & Purchase records if status requires them
@@ -262,11 +262,11 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.priority !== undefined) material.priority = updates.priority;
     if (updates.status !== undefined) {
       material.status = updates.status;
-      if (updates.status === 'Sectioned') {
+      if (updates.status === 'Material Approve') {
         (material as any).sectionedDate = new Date();
       } else if (updates.status === 'Material Selection') {
         (material as any).selectionDate = new Date();
-      } else if (updates.status === 'Material Approve') {
+      } else if (updates.status === 'Quotation Set') {
         (material as any).approvalDate = new Date();
       }
     }

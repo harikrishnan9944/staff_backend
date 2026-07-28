@@ -209,10 +209,12 @@ export const updatePurchase = async (req: AuthRequest, res: Response): Promise<v
     const { id } = req.params;
     const {
       vendorId,
+      vendorName,
       purchaseAmount,
       gst,
       discount,
       transactionFees,
+      purchaseDate,
       expectedDeliveryDate,
       remarks,
       attachments,
@@ -234,11 +236,17 @@ export const updatePurchase = async (req: AuthRequest, res: Response): Promise<v
     }
 
     if (vendorId) purchase.vendorId = vendorId;
+    if (vendorName !== undefined) purchase.vendorName = vendorName;
     if (purchaseAmount !== undefined) purchase.purchaseAmount = purchaseAmount;
     if (gst !== undefined) purchase.gst = gst;
     if (discount !== undefined) purchase.discount = discount;
     if (transactionFees !== undefined) purchase.transactionFees = transactionFees;
-    if (expectedDeliveryDate) purchase.expectedDeliveryDate = expectedDeliveryDate;
+    if (purchaseDate) {
+      purchase.purchaseDate = purchaseDate;
+      purchase.expectedDeliveryDate = purchaseDate;
+    } else if (expectedDeliveryDate) {
+      purchase.expectedDeliveryDate = expectedDeliveryDate;
+    }
     if (remarks !== undefined) purchase.remarks = remarks;
     if (attachments !== undefined) purchase.attachments = attachments;
 
