@@ -56,7 +56,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
     if (['Registered', 'Material Selection', 'Material Approve', 'Sectioned'].includes(material.status)) {
       res.status(400).json({ 
         success: false, 
-        message: 'Material request must be approved by Manager/Admin (Material Approve) before adding quotations.' 
+        message: 'Material request must be approved by Manager/Admin (Quotation Set) before adding quotations.' 
       });
       return;
     }
