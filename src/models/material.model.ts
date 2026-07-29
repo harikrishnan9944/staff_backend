@@ -10,6 +10,7 @@ export interface IMaterial extends Document {
   unit: string; // e.g. 'kg', 'sqft', 'pcs', 'bags'
   estimatedCost: number;
   vendorId?: Types.ObjectId;
+  vendorName?: string;
   priority: 'High' | 'Medium' | 'Low';
   status: 'Registered' | 'Material Selection' | 'Material Approve' | 'Sectioned' | 'Quotation Set' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
   assignedUser?: Types.ObjectId;
@@ -48,7 +49,8 @@ const MaterialSchema = new Schema<IMaterial>(
     },
     brand: {
       type: String,
-      required: [true, 'Brand is required'],
+      required: false,
+      default: 'Generic',
       trim: true,
     },
     description: {
@@ -57,7 +59,8 @@ const MaterialSchema = new Schema<IMaterial>(
     },
     quantity: {
       type: Number,
-      required: [true, 'Quantity is required'],
+      required: false,
+      default: 1,
       min: [0, 'Quantity cannot be negative'],
     },
     unit: {
@@ -75,6 +78,11 @@ const MaterialSchema = new Schema<IMaterial>(
     vendorId: {
       type: Schema.Types.ObjectId,
       ref: 'User', // Vendors can be users in the system or custom entities
+    },
+    vendorName: {
+      type: String,
+      default: '',
+      trim: true,
     },
     priority: {
       type: String,

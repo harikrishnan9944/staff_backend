@@ -4,6 +4,10 @@ import { Project } from '../models/project.model';
 import { Activity } from '../models/activity.model';
 import { Quotation } from '../models/quotation.model';
 import { Purchase } from '../models/purchase.model';
+import { Invoice } from '../models/invoice.model';
+import { DocumentFile } from '../models/document.model';
+import { MaterialWorkflow } from '../models/workflow.model';
+import { Payment } from '../models/payment.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 const syncMaterialRelatedRecords = async (material: any, userId: any) => {
@@ -16,7 +20,7 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
       if (!existingQuote) {
         await Quotation.create({
           materialId: matId,
-          vendor: 'Vendor',
+          vendor: material.vendorName || 'Vendor',
           amount: material.estimatedCost || (material.quantity * 10) || 0,
           description: material.description || material.remarks || 'Quotation record auto-generated',
           status: 'Approved',
@@ -39,7 +43,7 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
           purchaseOrderNumber,
           projectId: material.projectId,
           materialId: matId,
-          vendorName: 'Vendor',
+          vendorName: material.vendorName || 'Vendor',
           purchaseAmount: material.estimatedCost || (material.quantity * 10) || 0,
           gst: 0,
           discount: 0,
@@ -168,10 +172,11 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       materialImage,
       purchaseDeadline,
       section,
+      vendorName,
     } = req.body;
     const user = req.user;
 
-    if (!projectId || !materialName || !brand || quantity === undefined) {
+    if (!projectId || !materialName) {
       res.status(400).json({ success: false, message: 'Required fields are missing' });
       return;
     }
@@ -194,6 +199,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       purchaseDeadline: purchaseDeadline || '',
       remarks: remarks || '',
       section: section || '',
+      vendorName: vendorName || '',
       createdBy: user?._id,
       createdByRole: user?.role || 'Architect',
       lastUpdatedBy: user?._id,
@@ -275,6 +281,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.remarks !== undefined) material.remarks = updates.remarks;
     if (updates.purchaseDeadline !== undefined) material.purchaseDeadline = updates.purchaseDeadline;
     if (updates.section !== undefined) material.section = updates.section;
+    if (updates.vendorName !== undefined) material.vendorName = updates.vendorName;
 
     // Log last editor metrics
     material.lastUpdatedBy = user._id;
@@ -323,18 +330,35 @@ export const deleteMaterial = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    // Find all Purchase records for this material to delete their related payments
+    const purchases = await Purchase.find({ materialId: id }).select('_id');
+    const purchaseIds = purchases.map(p => p._id);
+
+    // Delete related Payments
+    if (purchaseIds.length > 0) {
+      await Payment.deleteMany({ purchaseId: { $in: purchaseIds } });
+    }
+
+    // Delete related Purchases, Quotations, Invoices, DocumentFiles, and MaterialWorkflows
+    await Purchase.deleteMany({ materialId: id });
+    await Quotation.deleteMany({ materialId: id });
+    await Invoice.deleteMany({ materialId: id });
+    await DocumentFile.deleteMany({ materialId: id });
+    await MaterialWorkflow.deleteMany({ materialId: id });
+
+    // Finally delete the material itself
     await Material.findByIdAndDelete(id);
 
     // Create log
     await Activity.create({
       user: user?._id,
-      action: `Deleted material '${material.materialName}'`,
+      action: `Deleted material '${material.materialName}' and all its associated quotations, purchase details, payments, invoices, documents, and workflows`,
       project: material.projectId,
     });
 
     res.status(200).json({
       success: true,
-      message: `Material '${material.materialName}' deleted successfully`,
+      message: `Material '${material.materialName}' and its related details deleted successfully`,
     });
   } catch (error) {
     console.error('deleteMaterial error:', error);

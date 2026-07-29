@@ -110,7 +110,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
           return;
         }
       } else if (status === 'Approved' || status === 'Rejected') {
-        if (!['Admin', 'Manager', 'Head of Operations'].includes(req.user?.role || '')) {
+        if (!['Admin', 'Manager', 'Head of Operations', 'Architect'].includes(req.user?.role || '')) {
           res.status(403).json({ success: false, message: 'You do not have permission to approve/reject quotations' });
           return;
         }
