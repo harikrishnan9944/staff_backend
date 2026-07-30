@@ -21,7 +21,7 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
         await Quotation.create({
           materialId: matId,
           vendor: material.vendorName || 'Vendor',
-          amount: material.estimatedCost || (material.quantity * 10) || 0,
+          amount: material.estimatedCost || 0,
           description: (material.description || material.remarks || 'Quotation record') + ' [Auto-Generated]',
           status: 'Approved',
         });
@@ -44,10 +44,10 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
           projectId: material.projectId,
           materialId: matId,
           vendorName: material.vendorName || 'Vendor',
-          purchaseAmount: material.estimatedCost || (material.quantity * 10) || 0,
+          purchaseAmount: material.estimatedCost || 0,
           gst: 0,
           discount: 0,
-          finalAmount: material.estimatedCost || (material.quantity * 10) || 0,
+          finalAmount: material.estimatedCost || 0,
           purchaseDate: new Date(),
           expectedDeliveryDate: new Date(),
           deliveryStatus: status === 'Bill Uploaded' ? 'Delivered' : 'Ordered',
