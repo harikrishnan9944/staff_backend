@@ -22,7 +22,7 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
           materialId: matId,
           vendor: material.vendorName || 'Vendor',
           amount: material.estimatedCost || (material.quantity * 10) || 0,
-          description: material.description || material.remarks || 'Quotation record auto-generated',
+          description: (material.description || material.remarks || 'Quotation record') + ' [Auto-Generated]',
           status: 'Approved',
         });
       } else if (existingQuote.status !== 'Approved') {
