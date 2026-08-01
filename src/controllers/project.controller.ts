@@ -65,8 +65,8 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const { name, clientName, location, startDate, expectedEndDate, status, remarks, assignedUsers, deletePassword } = req.body;
 
-    if (!name || !clientName || !location) {
-      res.status(400).json({ success: false, message: 'Name, clientName and location are required' });
+    if (!name) {
+      res.status(400).json({ success: false, message: 'Name is required' });
       return;
     }
 

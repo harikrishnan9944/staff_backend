@@ -8,6 +8,7 @@ export interface IQuotation extends Document {
   status: 'Pending' | 'Selected' | 'Approved' | 'Rejected';
   createdDate: string;
   quotationImage?: string;
+  transportCharges?: number;
 }
 
 const QuotationSchema = new Schema<IQuotation>(
@@ -43,6 +44,10 @@ const QuotationSchema = new Schema<IQuotation>(
     quotationImage: {
       type: String,
       default: '',
+    },
+    transportCharges: {
+      type: Number,
+      default: 0,
     },
   },
   {

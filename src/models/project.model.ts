@@ -31,7 +31,7 @@ const ProjectSchema = new Schema<IProject>(
     },
     location: {
       type: String,
-      required: [true, 'Location is required'],
+      default: '',
       trim: true,
     },
     startDate: {

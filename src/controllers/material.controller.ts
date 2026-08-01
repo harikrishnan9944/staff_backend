@@ -15,6 +15,39 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
     const status = material.status;
     const matId = material._id;
 
+    // Sync workflow stage for all statuses
+    let wfStatus = 'Material Selection';
+    let wfStage = 'Selection';
+    let wfProgress = 20;
+
+    if (status === 'Registered') {
+      wfStatus = 'Registered';
+      wfStage = 'Register';
+      wfProgress = 10;
+    } else if (status === 'Material Selection') {
+      wfStatus = 'Material Selection';
+      wfStage = 'Selection';
+      wfProgress = 20;
+    } else if (['Material Approve', 'Sectioned'].includes(status)) {
+      wfStatus = 'Sectioned';
+      wfStage = 'Selection';
+      wfProgress = 40;
+    } else if (status === 'Quotation Set') {
+      wfStatus = 'Quotation Selection';
+      wfStage = 'Quotation';
+      wfProgress = 50;
+    } else if (['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status)) {
+      wfStatus = 'Waiting for Purchase';
+      wfStage = 'Purchase';
+      wfProgress = 60;
+    }
+
+    await MaterialWorkflow.findOneAndUpdate(
+      { materialId: matId },
+      { status: wfStatus, currentStage: wfStage, progress: wfProgress },
+      { upsert: true }
+    );
+
     if (['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status)) {
       const existingQuote = await Quotation.findOne({ materialId: matId });
       if (!existingQuote) {
@@ -22,12 +55,23 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
           materialId: matId,
           vendor: material.vendorName || 'Vendor',
           amount: material.estimatedCost || 0,
+          transportCharges: material.transportCharges || 0,
           description: (material.description || material.remarks || 'Quotation record') + ' [Auto-Generated]',
           status: 'Approved',
         });
-      } else if (existingQuote.status !== 'Approved') {
-        existingQuote.status = 'Approved';
-        await existingQuote.save();
+      } else {
+        let changed = false;
+        if (existingQuote.status !== 'Approved') {
+          existingQuote.status = 'Approved';
+          changed = true;
+        }
+        if (existingQuote.transportCharges !== material.transportCharges) {
+          existingQuote.transportCharges = material.transportCharges || 0;
+          changed = true;
+        }
+        if (changed) {
+          await existingQuote.save();
+        }
       }
     }
 
@@ -171,8 +215,12 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       assignedUser,
       materialImage,
       purchaseDeadline,
+      materialSelectionDeadline,
+      quotationSelectionDeadline,
       section,
       vendorName,
+      transportCharges,
+      stayAtSelection,
     } = req.body;
     const user = req.user;
 
@@ -191,12 +239,16 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       quantity,
       unit: unit || 'pcs',
       estimatedCost: estimatedCost !== undefined ? estimatedCost : 0,
+      transportCharges: transportCharges !== undefined ? transportCharges : 0,
       vendorId,
       priority: priority || 'Medium',
       status: initialStatus,
+      stayAtSelection: !!stayAtSelection,
       assignedUser,
       materialImage: materialImage || '',
       purchaseDeadline: purchaseDeadline || '',
+      materialSelectionDeadline: materialSelectionDeadline || '',
+      quotationSelectionDeadline: quotationSelectionDeadline || '',
       remarks: remarks || '',
       section: section || '',
       vendorName: vendorName || '',
@@ -280,8 +332,12 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.materialImage !== undefined) material.materialImage = updates.materialImage;
     if (updates.remarks !== undefined) material.remarks = updates.remarks;
     if (updates.purchaseDeadline !== undefined) material.purchaseDeadline = updates.purchaseDeadline;
+    if (updates.materialSelectionDeadline !== undefined) material.materialSelectionDeadline = updates.materialSelectionDeadline;
+    if (updates.quotationSelectionDeadline !== undefined) material.quotationSelectionDeadline = updates.quotationSelectionDeadline;
     if (updates.section !== undefined) material.section = updates.section;
     if (updates.vendorName !== undefined) material.vendorName = updates.vendorName;
+    if (updates.transportCharges !== undefined) material.transportCharges = updates.transportCharges;
+    if (updates.stayAtSelection !== undefined) material.stayAtSelection = updates.stayAtSelection;
 
     // Log last editor metrics
     material.lastUpdatedBy = user._id;

@@ -9,15 +9,19 @@ export interface IMaterial extends Document {
   quantity: number;
   unit: string; // e.g. 'kg', 'sqft', 'pcs', 'bags'
   estimatedCost: number;
+  transportCharges?: number;
   vendorId?: Types.ObjectId;
   vendorName?: string;
   priority: 'High' | 'Medium' | 'Low';
-  status: 'Registered' | 'Material Selection' | 'Material Approve' | 'Sectioned' | 'Quotation Set' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
+  status: 'Registered' | 'Material Selection' | 'Material Approve' | 'Sectioned' | 'Quotation Set' | 'Awaiting Approval' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
   assignedUser?: Types.ObjectId;
   materialImage?: string;
   purchaseDeadline?: string;
+  materialSelectionDeadline?: string;
+  quotationSelectionDeadline?: string;
   remarks?: string;
   section?: string;
+  stayAtSelection?: boolean;
   createdBy: Types.ObjectId;
   createdByRole?: string;
   lastUpdatedBy?: Types.ObjectId;
@@ -75,6 +79,11 @@ const MaterialSchema = new Schema<IMaterial>(
       default: 0,
       min: [0, 'Estimated cost cannot be negative'],
     },
+    transportCharges: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
     vendorId: {
       type: Schema.Types.ObjectId,
       ref: 'User', // Vendors can be users in the system or custom entities
@@ -94,9 +103,13 @@ const MaterialSchema = new Schema<IMaterial>(
       default: '',
       trim: true,
     },
+    stayAtSelection: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
-      enum: ['Registered', 'Material Selection', 'Material Approve', 'Sectioned', 'Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded', 'Cancelled'],
+      enum: ['Registered', 'Material Selection', 'Material Approve', 'Sectioned', 'Quotation Set', 'Awaiting Approval', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded', 'Cancelled'],
       default: 'Registered',
     },
     assignedUser: {
@@ -108,6 +121,14 @@ const MaterialSchema = new Schema<IMaterial>(
       default: '',
     },
     purchaseDeadline: {
+      type: String,
+      default: '',
+    },
+    materialSelectionDeadline: {
+      type: String,
+      default: '',
+    },
+    quotationSelectionDeadline: {
       type: String,
       default: '',
     },
