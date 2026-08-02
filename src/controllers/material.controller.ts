@@ -36,6 +36,10 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
       wfStatus = 'Quotation Selection';
       wfStage = 'Quotation';
       wfProgress = 50;
+    } else if (status === 'Awaiting Approval') {
+      wfStatus = 'Awaiting Approval';
+      wfStage = 'Quotation';
+      wfProgress = 55;
     } else if (['Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(status)) {
       wfStatus = 'Waiting for Purchase';
       wfStage = 'Purchase';

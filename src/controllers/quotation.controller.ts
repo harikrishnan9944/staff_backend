@@ -180,12 +180,20 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
           { status: 'Pending' }
         );
 
-        // Update parent Material last updated details
+        // Update parent Material last updated details and set status to 'Awaiting Approval'
         await Material.findByIdAndUpdate(quotation.materialId, {
+          status: 'Awaiting Approval',
           lastUpdatedBy: req.user?._id,
           lastUpdatedByRole: req.user?.role,
           lastUpdatedDate: new Date(),
         });
+
+        // Sync workflow stage to Quotation Approval (Progress 55)
+        await MaterialWorkflow.findOneAndUpdate(
+          { materialId: quotation.materialId },
+          { status: 'Awaiting Approval', currentStage: 'Quotation', progress: 55 },
+          { upsert: true }
+        );
       } else if (status === 'Approved') {
         // Automatically reject all other quotes for the same material
         await Quotation.updateMany(
