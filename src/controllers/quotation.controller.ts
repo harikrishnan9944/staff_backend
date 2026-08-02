@@ -40,8 +40,8 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
 // POST /api/quotations
 export const createQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !['Admin', 'Manager', 'Head of Operations', 'Staff'].includes(req.user.role || '')) {
-      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, Head of Operations, and Staff can add quotations.' });
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can add quotations.' });
       return;
     }
     const { materialId, vendor, amount, description, quotationImage, transportCharges } = req.body;
@@ -160,8 +160,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     if (status !== undefined) {
       // Authorization Check
       if (status === 'Selected') {
-        if (!req.user || !['Admin', 'Manager', 'Head of Operations', 'Staff'].includes(req.user.role || '')) {
-          res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, Head of Operations, and Staff can select quotations.' });
+        if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+          res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can select quotations.' });
           return;
         }
       } else if (status === 'Approved' || status === 'Rejected') {
@@ -253,8 +253,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
 // DELETE /api/quotations/:id
 export const deleteQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !['Admin', 'Manager', 'Head of Operations', 'Staff'].includes(req.user.role || '')) {
-      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, Head of Operations, and Staff can delete quotations.' });
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can delete quotations.' });
       return;
     }
     const { id } = req.params;
