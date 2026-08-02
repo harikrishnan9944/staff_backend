@@ -63,6 +63,10 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
 // POST /api/projects
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can create projects.' });
+      return;
+    }
     const { name, clientName, location, startDate, expectedEndDate, status, remarks, assignedUsers, deletePassword } = req.body;
 
     if (!name) {
@@ -133,6 +137,10 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
 // PUT /api/projects/:id
 export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can update projects.' });
+      return;
+    }
     const { id } = req.params;
     const { name, clientName, location, startDate, expectedEndDate, status, remarks, progress, assignedUsers, deletePassword } = req.body;
 
@@ -212,6 +220,10 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
 // DELETE /api/projects/:id
 export const deleteProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can delete projects.' });
+      return;
+    }
     const { id } = req.params;
     const { deletePassword } = req.body;
     const deletePasswordVal = deletePassword || req.headers['x-delete-password'] || req.query.deletePassword;

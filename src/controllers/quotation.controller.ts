@@ -40,6 +40,10 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
 // POST /api/quotations
 export const createQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can add quotations.' });
+      return;
+    }
     const { materialId, vendor, amount, description, quotationImage, transportCharges } = req.body;
 
     if (!materialId || !vendor || amount === undefined) {
@@ -156,13 +160,13 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     if (status !== undefined) {
       // Authorization Check
       if (status === 'Selected') {
-        if (req.user?.role !== 'Architect' && !['Admin', 'Manager', 'Head of Operations'].includes(req.user?.role || '')) {
-          res.status(403).json({ success: false, message: 'Only Architects or Managers/Admins can select quotations' });
+        if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+          res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can select quotations.' });
           return;
         }
       } else if (status === 'Approved' || status === 'Rejected') {
-        if (!['Admin', 'Manager', 'Head of Operations', 'Architect'].includes(req.user?.role || '')) {
-          res.status(403).json({ success: false, message: 'You do not have permission to approve/reject quotations' });
+        if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+          res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can approve/reject quotations.' });
           return;
         }
       }
@@ -249,6 +253,10 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
 // DELETE /api/quotations/:id
 export const deleteQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can delete quotations.' });
+      return;
+    }
     const { id } = req.params;
 
     const quotation = await Quotation.findById(id);

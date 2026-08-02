@@ -125,6 +125,17 @@ export const requirePermissions = (requiredPermissions: string[]) => {
           'download_bills',
           'view_profile',
         ],
+        'Staff': [
+          'view_dashboard',
+          'view_assigned_projects',
+          'view_projects',
+          'select_materials',
+          'view_material_details',
+          'manage_purchase_orders',
+          'upload_invoices',
+          'update_purchase_status',
+          'view_profile',
+        ],
       };
 
       const rolePermissions = defaultRolePermissions[req.user.role] || [];

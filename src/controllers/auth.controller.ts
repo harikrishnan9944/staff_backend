@@ -25,6 +25,8 @@ const getPermissionsByRole = (role: IUser['role']): string[] => {
       return ['view_dashboard', 'manage_procurement', 'approve_materials'];
     case 'Accountant':
       return ['view_dashboard', 'manage_expenses', 'view_financials'];
+    case 'Staff':
+      return ['view_dashboard', 'manage_procurement', 'approve_materials'];
     default:
       return [];
   }

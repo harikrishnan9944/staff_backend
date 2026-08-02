@@ -18,7 +18,7 @@ router.use(authenticate);
 router.get('/', getPurchases);
 router.get('/:id', getPurchaseById);
 
-const allRoles = ['Admin', 'Manager', 'Head of Operations', 'Purchase Supervisor', 'Accountant', 'Supervisor', 'Architect'];
+const allRoles = ['Admin', 'Manager', 'Head of Operations', 'Purchase Supervisor', 'Accountant', 'Supervisor', 'Architect', 'Staff'];
 
 // Creation, modification and deletion endpoints (All roles allowed for testing)
 router.post('/', authorize(allRoles), createPurchase);
