@@ -16,6 +16,7 @@ export interface IMaterial extends Document {
   status: 'Registered' | 'Material Selection' | 'Material Approve' | 'Sectioned' | 'Quotation Set' | 'Awaiting Approval' | 'Quotation Approved' | 'Purchase Completed' | 'Bill Uploaded' | 'Cancelled';
   assignedUser?: Types.ObjectId;
   materialImage?: string;
+  materialSelectionImage?: string;
   purchaseDeadline?: string;
   materialSelectionDeadline?: string;
   quotationSelectionDeadline?: string;
@@ -117,6 +118,10 @@ const MaterialSchema = new Schema<IMaterial>(
       ref: 'User',
     },
     materialImage: {
+      type: String,
+      default: '',
+    },
+    materialSelectionImage: {
       type: String,
       default: '',
     },

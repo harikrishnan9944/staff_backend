@@ -16,6 +16,7 @@ import reportRoutes from './routes/report.routes';
 import settingsRoutes from './routes/settings.routes';
 import quotationRoutes from './routes/quotation.routes';
 import projectRoutes from './routes/project.routes';
+import categoryRoutes from './routes/category.routes';
 import { checkHealth } from './controllers/health.controller';
 
 // Load environment variables
@@ -61,6 +62,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Health check endpoint
 app.get('/health', checkHealth);

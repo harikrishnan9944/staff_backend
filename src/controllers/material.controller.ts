@@ -334,6 +334,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     }
     if (updates.assignedUser !== undefined) material.assignedUser = updates.assignedUser;
     if (updates.materialImage !== undefined) material.materialImage = updates.materialImage;
+    if (updates.materialSelectionImage !== undefined) material.materialSelectionImage = updates.materialSelectionImage;
     if (updates.remarks !== undefined) material.remarks = updates.remarks;
     if (updates.purchaseDeadline !== undefined) material.purchaseDeadline = updates.purchaseDeadline;
     if (updates.materialSelectionDeadline !== undefined) material.materialSelectionDeadline = updates.materialSelectionDeadline;
