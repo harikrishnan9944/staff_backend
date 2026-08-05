@@ -131,7 +131,7 @@ const seedDB = async () => {
     console.log('Seeding company profile...');
     await CompanySettings.create({
       companyName: 'Nila Construction Group Ltd',
-      companyLogo: 'http://localhost:5000/uploads/logo.png',
+      companyLogo: 'uploads/logo.png',
       address: '128 Wacker Drive, Chicago, IL, USA',
       phone: '+1 555-0199',
       email: 'info@nilagroup.com',
