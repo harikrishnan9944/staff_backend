@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Purchase } from '../models/purchase.model';
 import { Activity } from '../models/activity.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Material } from '../models/material.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
-// Helper to generate a unique PO number: PO-YYYYMMDD-XXXX
+// Helper to generate a collision-proof unique PO number: PO-YYYYMMDD-XXXX
 const generatePONumber = async (): Promise<string> => {
   const date = new Date();
   const year = date.getFullYear();
@@ -13,16 +14,17 @@ const generatePONumber = async (): Promise<string> => {
   const day = String(date.getDate()).padStart(2, '0');
   const dateStr = `${year}${month}${day}`;
 
-  // Find count of purchases today to create incremental suffix
-  const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-  const endOfDay = new Date(date.setHours(23, 59, 59, 999));
-  
-  const count = await Purchase.countDocuments({
-    createdAt: { $gte: startOfDay, $lte: endOfDay },
-  });
+  const count = await Purchase.countDocuments();
+  let suffixNum = count + 1;
+  let candidate = `PO-${dateStr}-${String(suffixNum).padStart(4, '0')}`;
 
-  const suffix = String(count + 1).padStart(4, '0');
-  return `PO-${dateStr}-${suffix}`;
+  // Loop to guarantee absolute uniqueness and avoid E11000 duplicate key error
+  while (await Purchase.findOne({ purchaseOrderNumber: candidate })) {
+    suffixNum++;
+    candidate = `PO-${dateStr}-${String(suffixNum).padStart(4, '0')}`;
+  }
+
+  return candidate;
 };
 
 // GET /api/purchases
@@ -147,13 +149,17 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
     // Auto generate PO number
     const purchaseOrderNumber = await generatePONumber();
 
+    const validCategoryId = (categoryId && categoryId !== 'undefined' && categoryId !== 'null' && categoryId !== '') ? categoryId : undefined;
+    const validVendorId = (vendorId && vendorId !== 'undefined' && vendorId !== 'null' && vendorId !== '') ? vendorId : undefined;
+    const creatorId = user?._id || new mongoose.Types.ObjectId();
+
     const purchase = await Purchase.create({
       purchaseOrderNumber,
       projectId,
-      categoryId: categoryId || undefined,
+      categoryId: validCategoryId,
       materialId,
-      quotationId,
-      vendorId: vendorId || undefined,
+      quotationId: quotationId || undefined,
+      vendorId: validVendorId,
       vendorName: vendorName || '',
       purchaseAmount,
       gst: computedGST,
@@ -166,8 +172,8 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
       paymentStatus: 'Pending',
       status: 'Draft',
       attachments: attachments || [],
-      remarks,
-      createdBy: user?._id,
+      remarks: remarks || '',
+      createdBy: creatorId,
     });
 
     // Create activity logs
@@ -196,9 +202,9 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
       message: `Purchase Order '${purchaseOrderNumber}' created successfully as Draft`,
       purchase: populatedPurchase,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('createPurchase error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: error?.message || 'Internal server error' });
   }
 };
 

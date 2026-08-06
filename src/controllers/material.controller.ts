@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
 import { Activity } from '../models/activity.model';
@@ -79,13 +80,19 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
       }
     }
 
+    const effectiveUserId = userId || material.createdBy || material.lastUpdatedBy;
+
     if (['Purchase Completed', 'Bill Uploaded'].includes(status)) {
       const existingPurchase = await Purchase.findOne({ materialId: matId });
       if (!existingPurchase) {
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const count = await Purchase.countDocuments();
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        const purchaseOrderNumber = `PO-${dateStr}-${String(count + 1).padStart(4, '0')}-${randomNum}`;
+        let suffixNum = count + 1;
+        let purchaseOrderNumber = `PO-${dateStr}-${String(suffixNum).padStart(4, '0')}`;
+        while (await Purchase.findOne({ purchaseOrderNumber })) {
+          suffixNum++;
+          purchaseOrderNumber = `PO-${dateStr}-${String(suffixNum).padStart(4, '0')}`;
+        }
 
         await Purchase.create({
           purchaseOrderNumber,
@@ -103,7 +110,7 @@ const syncMaterialRelatedRecords = async (material: any, userId: any) => {
           status: status === 'Bill Uploaded' ? 'Completed' : 'Approved',
           attachments: status === 'Bill Uploaded' ? ['bill-invoice.pdf'] : [],
           remarks: material.description || material.remarks || 'Purchase order generated from material status',
-          createdBy: userId,
+          createdBy: effectiveUserId,
         });
       } else if (status === 'Bill Uploaded') {
         if (existingPurchase.attachments.length === 0) {
@@ -234,9 +241,14 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const initialStatus = status || 'Material Selection';
+    const validCategoryId = (categoryId && categoryId !== 'undefined' && categoryId !== 'null' && categoryId !== '') ? categoryId : undefined;
+    const validVendorId = (vendorId && vendorId !== 'undefined' && vendorId !== 'null' && vendorId !== '') ? vendorId : undefined;
+    const validAssignedUser = (assignedUser && assignedUser !== 'undefined' && assignedUser !== 'null' && assignedUser !== '') ? assignedUser : undefined;
+
+    const creatorId = user?._id || new mongoose.Types.ObjectId();
     const material = await Material.create({
       projectId,
-      categoryId: categoryId || undefined,
+      categoryId: validCategoryId,
       materialName,
       brand,
       description: description || '',
@@ -244,11 +256,11 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       unit: unit || 'pcs',
       estimatedCost: estimatedCost !== undefined ? estimatedCost : 0,
       transportCharges: transportCharges !== undefined ? transportCharges : 0,
-      vendorId,
+      vendorId: validVendorId,
       priority: priority || 'Medium',
       status: initialStatus,
       stayAtSelection: !!stayAtSelection,
-      assignedUser,
+      assignedUser: validAssignedUser,
       materialImage: materialImage || '',
       purchaseDeadline: purchaseDeadline || '',
       materialSelectionDeadline: materialSelectionDeadline || '',
@@ -256,9 +268,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       remarks: remarks || '',
       section: section || '',
       vendorName: vendorName || '',
-      createdBy: user?._id,
+      createdBy: creatorId,
       createdByRole: user?.role || 'Architect',
-      lastUpdatedBy: user?._id,
+      lastUpdatedBy: creatorId,
       lastUpdatedByRole: user?.role || 'Architect',
       lastUpdatedDate: new Date(),
       sectionedDate: ['Material Approve', 'Quotation Set', 'Awaiting Approval', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
@@ -287,9 +299,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       message: 'Material created successfully',
       material: populatedMaterial,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('createMaterial error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: error?.message || 'Internal server error' });
   }
 };
 
@@ -315,12 +327,12 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     // Apply updates from request
     if (updates.materialName !== undefined) material.materialName = updates.materialName;
     if (updates.brand !== undefined) material.brand = updates.brand;
-    if (updates.categoryId !== undefined) material.categoryId = updates.categoryId;
+    if (updates.categoryId !== undefined) material.categoryId = (updates.categoryId && updates.categoryId !== 'undefined' && updates.categoryId !== 'null' && updates.categoryId !== '') ? updates.categoryId : undefined;
     if (updates.description !== undefined) material.description = updates.description;
     if (updates.quantity !== undefined) material.quantity = updates.quantity;
     if (updates.unit !== undefined) material.unit = updates.unit;
     if (updates.estimatedCost !== undefined) material.estimatedCost = updates.estimatedCost;
-    if (updates.vendorId !== undefined) material.vendorId = updates.vendorId;
+    if (updates.vendorId !== undefined) material.vendorId = (updates.vendorId && updates.vendorId !== 'undefined' && updates.vendorId !== 'null' && updates.vendorId !== '') ? updates.vendorId : undefined;
     if (updates.priority !== undefined) material.priority = updates.priority;
     if (updates.status !== undefined) {
       material.status = updates.status;
@@ -332,7 +344,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         (material as any).approvalDate = new Date();
       }
     }
-    if (updates.assignedUser !== undefined) material.assignedUser = updates.assignedUser;
+    if (updates.assignedUser !== undefined) material.assignedUser = (updates.assignedUser && updates.assignedUser !== 'undefined' && updates.assignedUser !== 'null' && updates.assignedUser !== '') ? updates.assignedUser : undefined;
     if (updates.materialImage !== undefined) material.materialImage = updates.materialImage;
     if (updates.materialSelectionImage !== undefined) material.materialSelectionImage = updates.materialSelectionImage;
     if (updates.remarks !== undefined) material.remarks = updates.remarks;
@@ -372,9 +384,9 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
       message: 'Material updated successfully',
       material: updatedMaterial,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('updateMaterial error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: error?.message || 'Internal server error' });
   }
 };
 
