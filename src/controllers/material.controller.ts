@@ -261,9 +261,9 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       lastUpdatedBy: user?._id,
       lastUpdatedByRole: user?.role || 'Architect',
       lastUpdatedDate: new Date(),
-      sectionedDate: ['Material Approve', 'Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
+      sectionedDate: ['Material Approve', 'Quotation Set', 'Awaiting Approval', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
       selectionDate: new Date(),
-      approvalDate: ['Quotation Set', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
+      approvalDate: ['Quotation Set', 'Awaiting Approval', 'Quotation Approved', 'Purchase Completed', 'Bill Uploaded'].includes(initialStatus) ? new Date() : undefined,
     });
 
     // Auto-sync Quotation & Purchase records if status requires them
