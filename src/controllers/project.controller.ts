@@ -3,6 +3,7 @@ import { Project } from '../models/project.model';
 import { ProjectMember } from '../models/projectMember.model';
 import { User } from '../models/user.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendNotificationToUser } from '../services/notification.service';
 import { Material } from '../models/material.model';
 import { Quotation } from '../models/quotation.model';
 import { Purchase } from '../models/purchase.model';
@@ -63,8 +64,8 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
 // POST /api/projects
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
-      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can create projects.' });
+    if (!req.user || req.user.role !== 'Admin') {
+      res.status(403).json({ success: false, message: 'Permission denied. Only Admin can create projects.' });
       return;
     }
     const { name, clientName, location, startDate, expectedEndDate, status, remarks, assignedUsers, deletePassword } = req.body;
@@ -123,6 +124,21 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
     const populatedProject = await Project.findById(project._id)
       .populate('assignedUsers', 'name username role profileImage');
 
+    // AUTOMATIC NOTIFICATION: Project Created
+    if (assignedUsers && Array.isArray(assignedUsers) && assignedUsers.length > 0) {
+      await sendNotificationToUser({
+        recipientIds: assignedUsers,
+        title: 'New Project Assigned',
+        message: `You have been assigned to project "${name}".`,
+        category: 'Project',
+        data: {
+          type: 'project_created',
+          projectId: project._id.toString(),
+        },
+        excludeUserId: req.user?._id,
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Project created successfully',
@@ -149,6 +165,7 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       res.status(404).json({ success: false, message: 'Project not found' });
       return;
     }
+    const oldStatus = project.status;
 
     if (assignedUsers && Array.isArray(assignedUsers)) {
       const users = await User.find({ _id: { $in: assignedUsers } });
@@ -201,10 +218,32 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       project.deletePassword = deletePassword;
     }
 
+    const statusChanged = status !== undefined && status !== oldStatus;
     await project.save();
 
     const populatedProject = await Project.findById(id)
       .populate('assignedUsers', 'name username role profileImage');
+
+    // AUTOMATIC NOTIFICATION: Project status changed
+    if (statusChanged) {
+      const memberDocs = await ProjectMember.find({ projectId: project._id }, 'userId');
+      const memberIds = memberDocs.map((m) => m.userId);
+      const recipientIds = Array.from(new Set([...(project.assignedUsers || []), ...memberIds]));
+
+      await sendNotificationToUser({
+        recipientIds,
+        roles: ['Admin', 'Manager'],
+        title: 'Project Status Changed',
+        message: `Project "${project.name}" status changed to "${status}".`,
+        category: 'Project',
+        data: {
+          type: 'project_status_changed',
+          projectId: project._id.toString(),
+          status,
+        },
+        excludeUserId: req.user?._id,
+      });
+    }
 
     res.status(200).json({
       success: true,

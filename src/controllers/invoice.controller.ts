@@ -6,6 +6,7 @@ import { Activity } from '../models/activity.model';
 import { Material } from '../models/material.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { uploadToCloudinary } from '../config/cloudinary';
+import { sendNotificationToUser } from '../services/notification.service';
 
 // GET /api/invoices
 // Authenticated user - Retrieve list of invoices with search, filter, and sort
@@ -176,6 +177,20 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate('projectId', 'name')
       .populate('purchaseId', 'purchaseOrderNumber');
+
+    // AUTOMATIC NOTIFICATION: New bill uploaded
+    await sendNotificationToUser({
+      roles: ['Accountant', 'Admin', 'Manager'],
+      title: 'New Bill Uploaded',
+      message: `Invoice/Bill #${invoiceNumber} of amount ${totalAmount} has been uploaded.`,
+      category: 'Payment',
+      data: {
+        type: 'bill_uploaded',
+        invoiceId: invoice._id.toString(),
+        invoiceNumber,
+      },
+      excludeUserId: user?._id,
+    });
 
     res.status(201).json({
       success: true,

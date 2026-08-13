@@ -10,6 +10,7 @@ import { DocumentFile } from '../models/document.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Payment } from '../models/payment.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendNotificationToUser } from '../services/notification.service';
 
 const syncMaterialRelatedRecords = async (material: any, userId: any) => {
   try {
@@ -284,9 +285,24 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
     // Create activity log entry
     await Activity.create({
       user: user?._id,
-      action: `Created material '${materialName}' for project`,
+      action: `Created material request '${materialName}' for project`,
       project: projectId,
     });
+
+    // AUTOMATIC NOTIFICATION: Task assigned (if assignedUser set on creation)
+    if (validAssignedUser) {
+      await sendNotificationToUser({
+        recipientIds: [validAssignedUser],
+        title: 'Task Assigned',
+        message: `You have been assigned to task/material "${materialName}".`,
+        category: 'Material',
+        data: {
+          type: 'task_assigned',
+          materialId: material._id.toString(),
+        },
+        excludeUserId: user?._id,
+      });
+    }
 
     const populatedMaterial = await Material.findById(material._id)
       .populate('categoryId', 'name color')
@@ -323,6 +339,9 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const updates = req.body;
+
+    const oldAssignedUser = material.assignedUser ? material.assignedUser.toString() : null;
+    const oldStatus = material.status;
 
     // Apply updates from request
     if (updates.materialName !== undefined) material.materialName = updates.materialName;
@@ -378,6 +397,45 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
       .populate('assignedUser', 'name username profileImage')
       .populate('createdBy', 'name username')
       .populate('lastUpdatedBy', 'name username');
+
+    // AUTOMATIC NOTIFICATION: Task assigned or Task status changed
+    const newAssignedUser = material.assignedUser ? material.assignedUser.toString() : null;
+    const isAssignmentChanged = newAssignedUser && newAssignedUser !== oldAssignedUser;
+    const isStatusChanged = updates.status !== undefined && updates.status !== oldStatus;
+
+    if (isAssignmentChanged && newAssignedUser) {
+      await sendNotificationToUser({
+        recipientIds: [newAssignedUser],
+        title: 'Task Assigned',
+        message: `You have been assigned to task/material "${material.materialName}".`,
+        category: 'Material',
+        data: {
+          type: 'task_assigned',
+          materialId: material._id.toString(),
+        },
+        excludeUserId: user._id,
+      });
+    }
+
+    if (isStatusChanged) {
+      const recipientIds: any[] = [];
+      if (material.createdBy) recipientIds.push(material.createdBy);
+      if (material.assignedUser) recipientIds.push(material.assignedUser);
+
+      await sendNotificationToUser({
+        recipientIds,
+        roles: ['Admin', 'Manager'],
+        title: 'Task Status Updated',
+        message: `Task/Material "${material.materialName}" status updated to "${material.status}".`,
+        category: 'Material',
+        data: {
+          type: 'task_status_changed',
+          materialId: material._id.toString(),
+          status: material.status,
+        },
+        excludeUserId: user._id,
+      });
+    }
 
     res.status(200).json({
       success: true,

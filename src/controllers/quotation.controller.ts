@@ -4,6 +4,7 @@ import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendNotificationToUser } from '../services/notification.service';
 
 // GET /api/quotations
 export const getQuotations = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -40,8 +41,8 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
 // POST /api/quotations
 export const createQuotation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !['Admin', 'Manager', 'Head of Operations'].includes(req.user.role || '')) {
-      res.status(403).json({ success: false, message: 'Permission denied. Only Admin, Manager, and Head of Operations can add quotations.' });
+    if (!req.user || !['Admin', 'Manager', 'Head of Operations', 'Staff', 'Supervisor', 'Purchase Supervisor', 'Architect'].includes(req.user.role || '')) {
+      res.status(403).json({ success: false, message: 'Permission denied. Only authorized users can add quotations.' });
       return;
     }
     const { materialId, vendor, amount, description, quotationImage, transportCharges } = req.body;
@@ -96,6 +97,21 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         { upsert: true }
       );
     }
+
+    // AUTOMATIC NOTIFICATION: New quotation created / approved
+    await sendNotificationToUser({
+      roles: ['Admin', 'Manager', 'Head of Operations', 'Supervisor'],
+      recipientIds: material.createdBy ? [material.createdBy] : [],
+      title: quotation.status === 'Approved' ? 'Quotation Approved' : 'New Quotation Created',
+      message: `Quotation for material "${material.materialName}" with vendor "${vendor}" for amount ${amount} has been ${quotation.status === 'Approved' ? 'approved' : 'created'}.`,
+      category: 'Quotation',
+      data: {
+        type: quotation.status === 'Approved' ? 'quotation_approved' : 'quotation_created',
+        quotationId: quotation._id.toString(),
+        materialId: materialId.toString(),
+      },
+      excludeUserId: req.user?._id,
+    });
 
     res.status(201).json({
       success: true,
@@ -246,6 +262,37 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     }
 
     await quotation.save();
+
+    // AUTOMATIC NOTIFICATION: Quotation Status Updates (Approved / Rejected)
+    if (status === 'Approved' || isNewRealQuote) {
+      const material = await Material.findById(quotation.materialId);
+      await sendNotificationToUser({
+        roles: ['Admin', 'Manager', 'Head of Operations'],
+        recipientIds: material?.createdBy ? [material.createdBy] : [],
+        title: 'Quotation Approved',
+        message: `Quotation for material "${material?.materialName || 'Request'}" has been approved.`,
+        category: 'Quotation',
+        data: {
+          type: 'quotation_approved',
+          quotationId: quotation._id.toString(),
+          materialId: quotation.materialId.toString(),
+        },
+      });
+    } else if (status === 'Rejected') {
+      const material = await Material.findById(quotation.materialId);
+      await sendNotificationToUser({
+        roles: ['Admin', 'Manager'],
+        recipientIds: material?.createdBy ? [material.createdBy] : [],
+        title: 'Quotation Rejected',
+        message: `Quotation for material "${material?.materialName || 'Request'}" has been rejected.`,
+        category: 'Quotation',
+        data: {
+          type: 'quotation_rejected',
+          quotationId: quotation._id.toString(),
+          materialId: quotation.materialId.toString(),
+        },
+      });
+    }
 
     res.status(200).json({
       success: true,

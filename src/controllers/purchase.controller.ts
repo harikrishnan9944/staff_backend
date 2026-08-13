@@ -5,6 +5,7 @@ import { Activity } from '../models/activity.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Material } from '../models/material.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendNotificationToUser } from '../services/notification.service';
 
 // Helper to generate a collision-proof unique PO number: PO-YYYYMMDD-XXXX
 const generatePONumber = async (): Promise<string> => {
@@ -196,6 +197,20 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
       .populate('projectId', 'name')
       .populate('materialId', 'materialName materialImage')
       .populate('vendorId', 'name');
+
+    // AUTOMATIC NOTIFICATION: New purchase request created
+    await sendNotificationToUser({
+      roles: ['Purchase Supervisor', 'Manager', 'Head of Operations', 'Admin'],
+      title: 'New Purchase Request',
+      message: `A new purchase request ${purchaseOrderNumber} for amount ${finalAmount} has been created.`,
+      category: 'Purchase',
+      data: {
+        type: 'purchase_request_created',
+        purchaseId: purchase._id.toString(),
+        purchaseOrderNumber,
+      },
+      excludeUserId: user?._id,
+    });
 
     res.status(201).json({
       success: true,
@@ -420,6 +435,35 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
         action: `${actionLog} for PO '${purchase.purchaseOrderNumber}'`,
         project: purchase.projectId,
       });
+
+      // AUTOMATIC NOTIFICATION: Purchase status transition (Approved / Cancelled)
+      if (status === 'Approved' || status === 'Ordered') {
+        await sendNotificationToUser({
+          recipientIds: purchase.createdBy ? [purchase.createdBy] : [],
+          roles: ['Purchase Supervisor', 'Admin'],
+          title: 'Purchase Request Approved',
+          message: `Purchase Order ${purchase.purchaseOrderNumber} has been approved (${status}).`,
+          category: 'Purchase',
+          data: {
+            type: 'purchase_request_approved',
+            purchaseId: purchase._id.toString(),
+            status,
+          },
+        });
+      } else if (status === 'Cancelled') {
+        await sendNotificationToUser({
+          recipientIds: purchase.createdBy ? [purchase.createdBy] : [],
+          roles: ['Purchase Supervisor', 'Admin'],
+          title: 'Purchase Request Cancelled',
+          message: `Purchase Order ${purchase.purchaseOrderNumber} was cancelled.`,
+          category: 'Purchase',
+          data: {
+            type: 'purchase_request_rejected',
+            purchaseId: purchase._id.toString(),
+            status,
+          },
+        });
+      }
 
       res.status(200).json({
         success: true,

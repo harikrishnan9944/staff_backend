@@ -3,6 +3,7 @@ import { Project } from '../models/project.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { Purchase } from '../models/purchase.model';
 import { ProjectMember } from '../models/projectMember.model';
+import { Notification } from '../models/notification.model';
 
 // Helper to filter projects query by role assignment
 const getProjectQueryByRole = async (userId: string, role: string) => {
@@ -150,7 +151,7 @@ export const getAnalyticsData = async (req: AuthRequest, res: Response): Promise
 };
 
 // GET /api/dashboard/notifications
-// Authenticated user - Retrieve personalized alerts
+// Authenticated user - Retrieve personalized alerts from database
 export const getNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user;
@@ -159,60 +160,15 @@ export const getNotifications = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const role = user.role;
+    const notifications = await Notification.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
 
-    const allNotifications = [
-      {
-        id: '1',
-        title: 'New Project Assigned',
-        message: 'You have been assigned as the lead Architect on Project Downtown Hub.',
-        roles: ['Architect', 'Admin'],
-        time: '2 hours ago',
-        read: false,
-      },
-      {
-        id: '2',
-        title: 'Material Selection Required',
-        message: 'Supervisor requested concrete quality approval for the foundation layout.',
-        roles: ['Architect', 'Admin', 'Manager'],
-        time: '4 hours ago',
-        read: false,
-      },
-      {
-        id: '3',
-        title: 'Quotation Approved',
-        message: 'Operations Manager signed off on the steel procurement quotation.',
-        roles: ['Head of Operations', 'Manager', 'Purchase Supervisor', 'Admin'],
-        time: '1 day ago',
-        read: true,
-      },
-      {
-        id: '4',
-        title: 'Invoice Uploaded',
-        message: 'Supervisor uploaded Site Invoice #4892 for concrete delivery.',
-        roles: ['Accountant', 'Admin'],
-        time: '1 day ago',
-        read: false,
-      },
-      {
-        id: '5',
-        title: 'Payment Disbursed',
-        message: 'Vendor payment of $25,000 for framing timber has been completed.',
-        roles: ['Accountant', 'Purchase Supervisor', 'Admin'],
-        time: '2 days ago',
-        read: true,
-      },
-    ];
-
-    const filteredNotifications = allNotifications.filter(
-      (n) => n.roles.includes(role) || role === 'Admin'
-    );
-
-    const unreadCount = filteredNotifications.filter((n) => !n.read).length;
+    const unreadCount = await Notification.countDocuments({ userId: user._id, read: false });
 
     res.status(200).json({
       success: true,
-      notifications: filteredNotifications,
+      notifications,
       unreadCount,
     });
   } catch (error) {

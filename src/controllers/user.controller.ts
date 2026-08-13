@@ -7,6 +7,7 @@ import { Project } from '../models/project.model';
 import { AuditLog } from '../models/auditLog.model';
 import { LoginHistory } from '../models/loginHistory.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendNotificationToUser } from '../services/notification.service';
 import bcrypt from 'bcryptjs';
 
 // GET /api/users
@@ -244,6 +245,18 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     await user.save();
+
+    // AUTOMATIC NOTIFICATION: Important admin account update
+    await sendNotificationToUser({
+      recipientIds: [user._id],
+      title: 'Account Details Updated',
+      message: `Your account details / permissions have been updated by Administrator.`,
+      category: 'System',
+      data: {
+        type: 'admin_update',
+        userId: user._id.toString(),
+      },
+    });
 
     const updatedUser = await User.findById(id)
       .select('-password')
@@ -600,3 +613,47 @@ export const getLoginHistory = async (req: AuthRequest, res: Response): Promise<
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
+
+// POST /api/users/push-token
+export const updatePushToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    const { pushToken } = req.body;
+
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    if (!pushToken || typeof pushToken !== 'string') {
+      res.status(400).json({ success: false, message: 'pushToken is required' });
+      return;
+    }
+
+    const tokenClean = pushToken.trim();
+    const dbUser = await User.findById(user._id);
+    if (!dbUser) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    dbUser.pushToken = tokenClean;
+    if (!dbUser.pushTokens) {
+      dbUser.pushTokens = [];
+    }
+    if (!dbUser.pushTokens.includes(tokenClean)) {
+      dbUser.pushTokens.push(tokenClean);
+    }
+
+    await dbUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Push token registered successfully',
+    });
+  } catch (error) {
+    console.error('updatePushToken error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+

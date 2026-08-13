@@ -13,6 +13,7 @@ import {
   getProjectStaff,
   getAuditLogs,
   getLoginHistory,
+  updatePushToken,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateRequest } from '../middlewares/validate.middleware';
@@ -22,6 +23,9 @@ const router = Router();
 
 // All routes require authentication
 router.use(authenticate);
+
+// Push token registration for logged-in user
+router.post('/push-token', updatePushToken);
 
 // Admin-only operations
 router.get('/', authorize(['Admin']), getUsers);

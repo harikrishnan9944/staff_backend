@@ -18,6 +18,8 @@ export interface IUser extends Document {
   joiningDate?: Date;
   remarks?: string;
   twoFactorEnabled?: boolean;
+  pushToken?: string;
+  pushTokens?: string[];
   loginHistory?: Array<{
     timestamp: Date;
     ipAddress?: string;
@@ -117,6 +119,14 @@ const UserSchema = new Schema<IUser>(
     twoFactorEnabled: {
       type: Boolean,
       default: false,
+    },
+    pushToken: {
+      type: String,
+      default: '',
+    },
+    pushTokens: {
+      type: [String],
+      default: [],
     },
     loginHistory: [
       {
