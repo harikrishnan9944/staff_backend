@@ -174,6 +174,19 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
       lastUpdatedDate: new Date(),
     });
 
+    // AUTOMATIC NOTIFICATION: Bill / Invoice Uploaded
+    await sendNotificationToUser({
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      title: '🧾 New Bill & Invoice Uploaded',
+      message: `📎 Invoice #${invoiceNumber} (₹${totalAmount}) has been uploaded and linked to PO!`,
+      category: 'Payment',
+      data: {
+        type: 'bill_uploaded',
+        invoiceId: invoice._id.toString(),
+        invoiceNumber,
+      },
+    });
+
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate('projectId', 'name')
       .populate('purchaseId', 'purchaseOrderNumber');
@@ -316,9 +329,9 @@ export const verifyInvoice = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Role check: Accountant or Admin only
-    if (user.role !== 'Accountant' && user.role !== 'Admin') {
-      res.status(403).json({ success: false, message: 'Only Accountants or Admins can audit/verify invoices' });
+    // Role check: Admin, Head of Operations, Manager
+    if (!['Admin', 'Head of Operations', 'Manager'].includes(user.role)) {
+      res.status(403).json({ success: false, message: 'Only Admins, Head of Operations, or Managers can audit/verify invoices' });
       return;
     }
 

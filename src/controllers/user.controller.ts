@@ -496,6 +496,24 @@ export const assignProjectStaff = async (req: AuthRequest, res: Response): Promi
       details: `Assigned user '${targetUser.name}' to project role '${role}'`
     });
 
+    const targetProject = await Project.findById(projectId);
+    const projectName = targetProject ? targetProject.name : 'Project';
+
+    // AUTOMATIC NOTIFICATION: Project Assigned to User
+    await sendNotificationToUser({
+      recipientIds: [userId],
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      title: '📋 Project & Task Assignment',
+      message: `⭐ Staff member '${targetUser.name}' was assigned to project "${projectName}" as ${role}. Let's build something awesome!`,
+      category: 'Project',
+      data: {
+        type: 'project_assigned',
+        projectId: projectId.toString(),
+        targetUserId: userId.toString(),
+        role,
+      },
+    });
+
     res.status(200).json({
       success: true,
       message: `Successfully assigned '${targetUser.name}' as '${role}'`,
@@ -646,10 +664,12 @@ export const updatePushToken = async (req: AuthRequest, res: Response): Promise<
     }
 
     await dbUser.save();
+    console.log(`[PushToken] Registered token for user '${dbUser.username}' (${dbUser.name}): ${tokenClean}`);
 
     res.status(200).json({
       success: true,
       message: 'Push token registered successfully',
+      pushToken: tokenClean,
     });
   } catch (error) {
     console.error('updatePushToken error:', error);

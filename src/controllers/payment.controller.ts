@@ -3,6 +3,7 @@ import { Payment } from '../models/payment.model';
 import { Purchase } from '../models/purchase.model';
 import { Activity } from '../models/activity.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendNotificationToUser } from '../services/notification.service';
 
 // Helper to recalculate and sync linked Purchase Order payment status
 const syncPurchasePaymentStatus = async (purchaseId: string): Promise<void> => {
@@ -145,6 +146,19 @@ export const createPayment = async (req: AuthRequest, res: Response): Promise<vo
       user: user?._id,
       action: `Disbursed payment of $${amount} via ${paymentType} for PO '${purchase.purchaseOrderNumber}'`,
       project: purchase.projectId,
+    });
+
+    // AUTOMATIC NOTIFICATION: Payment Disbursed
+    await sendNotificationToUser({
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      title: '💸 Payment Disbursed',
+      message: `💵 Payment of ₹${amount} disbursed via ${paymentType} for PO #${purchase.purchaseOrderNumber}.`,
+      category: 'Payment',
+      data: {
+        type: 'payment_disbursed',
+        paymentId: payment._id.toString(),
+        amount,
+      },
     });
 
     res.status(201).json({

@@ -5,7 +5,7 @@ export interface IUser extends Document {
   name: string;
   username: string;
   password: string;
-  role: 'Admin' | 'Architect' | 'Head of Operations' | 'Manager' | 'Supervisor' | 'Purchase Supervisor' | 'Accountant' | 'Staff';
+  role: 'Admin' | 'Head of Operations' | 'Manager' | 'Staff';
   email: string;
   phone?: string;
   profileImage?: string;
@@ -55,12 +55,8 @@ const UserSchema = new Schema<IUser>(
       enum: {
         values: [
           'Admin',
-          'Architect',
           'Head of Operations',
           'Manager',
-          'Supervisor',
-          'Purchase Supervisor',
-          'Accountant',
           'Staff',
         ],
         message: '{VALUE} is not a valid role',

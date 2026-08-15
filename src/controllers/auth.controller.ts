@@ -13,18 +13,10 @@ const getPermissionsByRole = (role: IUser['role']): string[] => {
   switch (role) {
     case 'Admin':
       return ['all'];
-    case 'Architect':
-      return ['view_dashboard', 'manage_blueprints', 'view_projects'];
     case 'Head of Operations':
       return ['view_dashboard', 'manage_operations', 'view_all_projects'];
     case 'Manager':
       return ['view_dashboard', 'manage_staff', 'manage_projects'];
-    case 'Supervisor':
-      return ['view_dashboard', 'manage_daily_logs', 'view_assigned_projects'];
-    case 'Purchase Supervisor':
-      return ['view_dashboard', 'manage_procurement', 'approve_materials'];
-    case 'Accountant':
-      return ['view_dashboard', 'manage_expenses', 'view_financials'];
     case 'Staff':
       return ['view_dashboard', 'manage_procurement', 'approve_materials'];
     default:

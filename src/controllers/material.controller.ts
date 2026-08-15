@@ -289,18 +289,31 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       project: projectId,
     });
 
+    // AUTOMATIC NOTIFICATION: New Material Created
+    await sendNotificationToUser({
+      roles: ['Admin', 'Manager', 'Head of Operations', 'Staff'],
+      title: '📦 New Material Request Added',
+      message: `✨ Material "${materialName}" (${quantity} ${unit}) has been added for project. Ready for review & quotations!`,
+      category: 'Material',
+      data: {
+        type: 'material_created',
+        materialId: material._id.toString(),
+        projectId: projectId.toString(),
+      },
+    });
+
     // AUTOMATIC NOTIFICATION: Task assigned (if assignedUser set on creation)
     if (validAssignedUser) {
       await sendNotificationToUser({
         recipientIds: [validAssignedUser],
-        title: 'Task Assigned',
-        message: `You have been assigned to task/material "${materialName}".`,
+        roles: ['Admin', 'Manager', 'Head of Operations', 'Staff'],
+        title: '📋 Task Assigned to You',
+        message: `⭐ You have been assigned to task/material "${materialName}".`,
         category: 'Material',
         data: {
           type: 'task_assigned',
           materialId: material._id.toString(),
         },
-        excludeUserId: user?._id,
       });
     }
 
@@ -422,18 +435,21 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
       if (material.createdBy) recipientIds.push(material.createdBy);
       if (material.assignedUser) recipientIds.push(material.assignedUser);
 
+      const isSelection = ['Material Approve', 'Sectioned', 'Material Selection'].includes(material.status);
+
       await sendNotificationToUser({
         recipientIds,
-        roles: ['Admin', 'Manager'],
-        title: 'Task Status Updated',
-        message: `Task/Material "${material.materialName}" status updated to "${material.status}".`,
+        roles: ['Admin', 'Manager', 'Head of Operations', 'Staff'],
+        title: isSelection ? '🎯 Material Approved & Selected' : '🔄 Material Status Updated',
+        message: isSelection 
+          ? `✅ Material "${material.materialName}" was approved & selected for procurement!` 
+          : `📌 Material "${material.materialName}" status changed to "${material.status}".`,
         category: 'Material',
         data: {
-          type: 'task_status_changed',
+          type: isSelection ? 'material_selected' : 'task_status_changed',
           materialId: material._id.toString(),
           status: material.status,
         },
-        excludeUserId: user._id,
       });
     }
 

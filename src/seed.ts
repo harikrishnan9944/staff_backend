@@ -47,19 +47,6 @@ const seedDB = async () => {
       department: 'Administration & IT',
     });
 
-    const architectUser = await User.create({
-      name: 'Marcus Stone',
-      username: 'architect',
-      password: 'password123',
-      role: 'Architect',
-      email: 'marcus@construction.com',
-      phone: '+15550211',
-      profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=256&h=256&fit=crop',
-      isActive: true,
-      employeeId: 'EMP-0022',
-      department: 'Design',
-    });
-
     const opsHeadUser = await User.create({
       name: 'Sarah Connor',
       username: 'opshead',
@@ -86,46 +73,20 @@ const seedDB = async () => {
       department: 'Management',
     });
 
-    const supervisorUser = await User.create({
-      name: 'Jack Vance',
-      username: 'supervisor',
+    const staffUser = await User.create({
+      name: 'Krishnan',
+      username: 'hari_123',
       password: 'password123',
-      role: 'Supervisor',
-      email: 'jack@construction.com',
+      role: 'Staff',
+      email: 'krishnan@construction.com',
       phone: '+15550244',
       profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=256&h=256&fit=crop',
       isActive: true,
       employeeId: 'EMP-0055',
-      department: 'Site Supervision',
+      department: 'Site Execution',
     });
 
-    const purchaserUser = await User.create({
-      name: 'Bill Gates',
-      username: 'purchaser',
-      password: 'password123',
-      role: 'Purchase Supervisor',
-      email: 'bill@construction.com',
-      phone: '+15550255',
-      profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=256&h=256&fit=crop',
-      isActive: true,
-      employeeId: 'EMP-0066',
-      department: 'Procurement',
-    });
-
-    const accountantUser = await User.create({
-      name: 'Peter Parker',
-      username: 'accountant',
-      password: 'password123',
-      role: 'Accountant',
-      email: 'peter@construction.com',
-      phone: '+15550266',
-      profileImage: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=256&h=256&fit=crop',
-      isActive: true,
-      employeeId: 'EMP-0077',
-      department: 'Finance',
-    });
-
-    console.log('Seeded standard users');
+    console.log('Seeded standard users (Admin, Head of Operations, Manager, Staff)');
 
     // 3. Seed Company Settings
     console.log('Seeding company profile...');
@@ -153,7 +114,7 @@ const seedDB = async () => {
       progress: 45,
       stage: 'Foundation',
       status: 'Active',
-      assignedUsers: [opsHeadUser._id, managerUser._id, purchaserUser._id, supervisorUser._id, architectUser._id, accountantUser._id],
+      assignedUsers: [opsHeadUser._id, managerUser._id, staffUser._id],
       deletePassword: 'delete123',
     });
 
@@ -163,7 +124,7 @@ const seedDB = async () => {
       progress: 85,
       stage: 'Finishing',
       status: 'Active',
-      assignedUsers: [managerUser._id, supervisorUser._id, architectUser._id],
+      assignedUsers: [managerUser._id, staffUser._id],
       deletePassword: 'delete123',
     });
 
@@ -173,7 +134,7 @@ const seedDB = async () => {
       progress: 20,
       stage: 'Foundation',
       status: 'Active',
-      assignedUsers: [opsHeadUser._id, supervisorUser._id, architectUser._id],
+      assignedUsers: [opsHeadUser._id, staffUser._id],
       deletePassword: 'delete123',
     });
 
@@ -183,7 +144,7 @@ const seedDB = async () => {
       progress: 65,
       stage: 'Framing',
       status: 'Active',
-      assignedUsers: [managerUser._id, purchaserUser._id, accountantUser._id],
+      assignedUsers: [managerUser._id, staffUser._id],
       deletePassword: 'delete123',
     });
 
@@ -193,7 +154,7 @@ const seedDB = async () => {
       progress: 10,
       stage: 'Planning',
       status: 'Planning',
-      assignedUsers: [opsHeadUser._id, managerUser._id, supervisorUser._id],
+      assignedUsers: [opsHeadUser._id, managerUser._id, staffUser._id],
       deletePassword: 'delete123',
     });
 
@@ -213,23 +174,8 @@ const seedDB = async () => {
       },
       {
         projectId: project1._id,
-        userId: purchaserUser._id,
-        role: 'Purchaser',
-      },
-      {
-        projectId: project1._id,
-        userId: supervisorUser._id,
-        role: 'Supervisor',
-      },
-      {
-        projectId: project1._id,
-        userId: architectUser._id,
-        role: 'Architect',
-      },
-      {
-        projectId: project1._id,
-        userId: accountantUser._id,
-        role: 'Accountant',
+        userId: staffUser._id,
+        role: 'Staff',
       },
       {
         projectId: project2._id,
@@ -238,13 +184,8 @@ const seedDB = async () => {
       },
       {
         projectId: project2._id,
-        userId: supervisorUser._id,
-        role: 'Supervisor',
-      },
-      {
-        projectId: project2._id,
-        userId: architectUser._id,
-        role: 'Architect',
+        userId: staffUser._id,
+        role: 'Staff',
       },
       {
         projectId: project3._id,
@@ -253,13 +194,8 @@ const seedDB = async () => {
       },
       {
         projectId: project3._id,
-        userId: supervisorUser._id,
-        role: 'Supervisor',
-      },
-      {
-        projectId: project3._id,
-        userId: architectUser._id,
-        role: 'Architect',
+        userId: staffUser._id,
+        role: 'Staff',
       },
       {
         projectId: project4._id,
@@ -268,13 +204,8 @@ const seedDB = async () => {
       },
       {
         projectId: project4._id,
-        userId: purchaserUser._id,
-        role: 'Purchaser',
-      },
-      {
-        projectId: project4._id,
-        userId: accountantUser._id,
-        role: 'Accountant',
+        userId: staffUser._id,
+        role: 'Staff',
       },
       {
         projectId: project5._id,
@@ -285,11 +216,6 @@ const seedDB = async () => {
         projectId: project5._id,
         userId: managerUser._id,
         role: 'Project Manager',
-      },
-      {
-        projectId: project5._id,
-        userId: supervisorUser._id,
-        role: 'Supervisor',
       },
     ]);
 
@@ -305,8 +231,8 @@ const seedDB = async () => {
       estimatedCost: 15,
       priority: 'High',
       status: 'Purchase Completed',
-      assignedUser: architectUser._id,
-      remarks: 'Architect selected galaxy pattern.',
+      assignedUser: staffUser._id,
+      remarks: 'Granite pattern selected.',
       createdBy: managerUser._id,
     });
 
@@ -320,8 +246,8 @@ const seedDB = async () => {
       estimatedCost: 45,
       priority: 'High',
       status: 'Bill Uploaded',
-      assignedUser: supervisorUser._id,
-      remarks: 'Delivered and verified by accountant.',
+      assignedUser: staffUser._id,
+      remarks: 'Delivered and verified.',
       createdBy: managerUser._id,
     });
 
@@ -372,7 +298,7 @@ const seedDB = async () => {
       paymentStatus: 'Pending',
       status: 'Approved',
       remarks: 'Approved by Operations Head.',
-      createdBy: purchaserUser._id,
+      createdBy: managerUser._id,
     });
 
     console.log('Seeded purchase orders');
@@ -389,7 +315,7 @@ const seedDB = async () => {
       status: 'Completed',
       paymentDate: new Date(),
       notes: 'Initial deposit of 50% released.',
-      createdBy: accountantUser._id,
+      createdBy: managerUser._id,
     });
 
     // Update PO payment status
@@ -412,8 +338,8 @@ const seedDB = async () => {
       totalAmount: 2124,
       invoiceFiles: ['https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=600'],
       verificationStatus: 'Pending',
-      remarks: 'Invoice uploaded. Pending accountant audit.',
-      uploadedBy: purchaserUser._id,
+      remarks: 'Invoice uploaded. Pending audit.',
+      uploadedBy: staffUser._id,
     });
 
     console.log('Seeded invoices');
@@ -429,7 +355,7 @@ const seedDB = async () => {
         folder: 'Project',
         projectId: project1._id,
         version: 1,
-        uploadedBy: architectUser._id,
+        uploadedBy: managerUser._id,
       },
       {
         name: 'Italian Marble Invoice.jpg',
@@ -440,7 +366,7 @@ const seedDB = async () => {
         projectId: project1._id,
         invoiceId: invoice._id,
         version: 1,
-        uploadedBy: purchaserUser._id,
+        uploadedBy: staffUser._id,
       },
     ]);
 

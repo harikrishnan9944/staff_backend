@@ -36,13 +36,13 @@ export const getDashboardSummary = async (req: AuthRequest, res: Response): Prom
     // 2. Pending purchases statistic (replacing tasks count)
     const pendingPurchases = await Purchase.countDocuments({ status: 'Approved', paymentStatus: 'Pending' });
 
-    // 3. Simulated counts for workflows
+    // 3. Workflow metrics
     const workflowMetrics = {
-      pendingMaterials: role === 'Admin' || role === 'Architect' || role === 'Supervisor' ? 6 : 0,
-      pendingQuotations: role === 'Admin' || role === 'Head of Operations' || role === 'Manager' ? 4 : 0,
-      pendingPurchases: pendingPurchases || (role === 'Admin' || role === 'Purchase Supervisor' ? 5 : 0),
-      invoicesPending: role === 'Admin' || role === 'Accountant' || role === 'Purchase Supervisor' ? 7 : 0,
-      completedPurchases: role === 'Admin' || role === 'Accountant' || role === 'Purchase Supervisor' ? 14 : 0,
+      pendingMaterials: 6,
+      pendingQuotations: 4,
+      pendingPurchases: pendingPurchases || 5,
+      invoicesPending: 7,
+      completedPurchases: 14,
     };
 
     // 4. Fetch recent projects

@@ -200,16 +200,15 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
 
     // AUTOMATIC NOTIFICATION: New purchase request created
     await sendNotificationToUser({
-      roles: ['Purchase Supervisor', 'Manager', 'Head of Operations', 'Admin'],
-      title: 'New Purchase Request',
-      message: `A new purchase request ${purchaseOrderNumber} for amount ${finalAmount} has been created.`,
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      title: '🛒 Purchase Order Initiated',
+      message: `📄 PO #${purchaseOrderNumber} for ₹${finalAmount} has been generated and sent to vendor!`,
       category: 'Purchase',
       data: {
         type: 'purchase_request_created',
         purchaseId: purchase._id.toString(),
         purchaseOrderNumber,
       },
-      excludeUserId: user?._id,
     });
 
     res.status(201).json({
@@ -359,21 +358,9 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
 
     // 1. PO State Transitions Guards
     if (status && status !== purchase.status) {
-      if (role === 'Admin' || role === 'Head of Operations' || role === 'Manager') {
+      if (role === 'Admin' || role === 'Head of Operations' || role === 'Manager' || role === 'Staff') {
         allowed = true;
       } 
-      else if (role === 'Purchase Supervisor' && status === 'Ordered' && purchase.status === 'Draft') {
-        allowed = true; // Purchase Supervisor can change Draft to Ordered
-      } 
-      else if (role === 'Purchase Supervisor' && status === 'Completed' && purchase.status === 'Delivered') {
-        allowed = true; // Completed once delivered
-      } 
-      else if (status === 'Cancelled' && ['Draft', 'Ordered'].includes(purchase.status)) {
-        // Purchase Supervisor can cancel pending orders (Manager/Admin/Ops Head are already allowed above)
-        if (role === 'Purchase Supervisor') {
-          allowed = true;
-        }
-      }
 
       if (allowed) {
         purchase.status = status;
@@ -402,9 +389,9 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
       }
     }
 
-    // 2. Accountant Payment Status Updates
+    // 2. Payment Status Updates
     if (paymentStatus && paymentStatus !== purchase.paymentStatus) {
-      if (role === 'Accountant' || role === 'Admin' || role === 'Head of Operations' || role === 'Manager') {
+      if (role === 'Admin' || role === 'Head of Operations' || role === 'Manager' || role === 'Staff') {
         purchase.paymentStatus = paymentStatus;
         actionLog = (actionLog ? actionLog + ', ' : '') + `Updated Payment Status to '${paymentStatus}'`;
         
@@ -419,7 +406,7 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
       } else {
         res.status(403).json({
           success: false,
-          message: 'Only Accountants or Admins can modify payment statuses',
+          message: 'Not authorized to modify payment status',
         });
         return;
       }
@@ -436,13 +423,24 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
         project: purchase.projectId,
       });
 
-      // AUTOMATIC NOTIFICATION: Purchase status transition (Approved / Cancelled)
-      if (status === 'Approved' || status === 'Ordered') {
+      // AUTOMATIC NOTIFICATION: Purchase status transition (Approved / Completed / Cancelled)
+      if (status === 'Completed') {
         await sendNotificationToUser({
-          recipientIds: purchase.createdBy ? [purchase.createdBy] : [],
-          roles: ['Purchase Supervisor', 'Admin'],
-          title: 'Purchase Request Approved',
-          message: `Purchase Order ${purchase.purchaseOrderNumber} has been approved (${status}).`,
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          title: '🥳 Purchase Completed Successfully!',
+          message: `🏆 Purchase Order #${purchase.purchaseOrderNumber} is fully delivered and completed! Great job team! 🎉`,
+          category: 'Purchase',
+          data: {
+            type: 'purchase_completed',
+            purchaseId: purchase._id.toString(),
+            purchaseOrderNumber: purchase.purchaseOrderNumber,
+          },
+        });
+      } else if (status === 'Approved' || status === 'Ordered') {
+        await sendNotificationToUser({
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          title: '✅ Purchase Order Approved',
+          message: `🚚 Purchase Order #${purchase.purchaseOrderNumber} status set to ${status}. Goods on the way!`,
           category: 'Purchase',
           data: {
             type: 'purchase_request_approved',
@@ -452,10 +450,9 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
         });
       } else if (status === 'Cancelled') {
         await sendNotificationToUser({
-          recipientIds: purchase.createdBy ? [purchase.createdBy] : [],
-          roles: ['Purchase Supervisor', 'Admin'],
-          title: 'Purchase Request Cancelled',
-          message: `Purchase Order ${purchase.purchaseOrderNumber} was cancelled.`,
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          title: '🚫 Purchase Order Cancelled',
+          message: `⚠️ Purchase Order #${purchase.purchaseOrderNumber} was cancelled.`,
           category: 'Purchase',
           data: {
             type: 'purchase_request_rejected',

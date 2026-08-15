@@ -128,6 +128,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
     if (assignedUsers && Array.isArray(assignedUsers) && assignedUsers.length > 0) {
       await sendNotificationToUser({
         recipientIds: assignedUsers,
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         title: 'New Project Assigned',
         message: `You have been assigned to project "${name}".`,
         category: 'Project',
@@ -135,7 +136,6 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
           type: 'project_created',
           projectId: project._id.toString(),
         },
-        excludeUserId: req.user?._id,
       });
     }
 

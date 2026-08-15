@@ -82,48 +82,14 @@ export const requirePermissions = (requiredPermissions: string[]) => {
     }
 
     try {
-      // Map of default permissions for the 6 roles + Admin
+      // Map of default permissions for the 4 roles
       const defaultRolePermissions: Record<string, string[]> = {
         'Admin': ['all'],
-        'Architect': [
-          'view_dashboard',
-          'view_assigned_projects',
-          'select_materials',
-          'view_material_details',
-          'create_comments',
-          'view_profile',
-        ],
         'Head of Operations': [
           'all',
         ],
         'Manager': [
           'all',
-        ],
-        'Supervisor': [
-          'view_dashboard',
-          'view_assigned_projects',
-          'select_materials',
-          'update_progress',
-          'create_comments',
-          'upload_site_photos',
-          'view_profile',
-        ],
-        'Purchase Supervisor': [
-          'view_dashboard',
-          'view_projects',
-          'manage_purchase_orders',
-          'view_vendors',
-          'upload_invoices',
-          'update_purchase_status',
-          'view_profile',
-        ],
-        'Accountant': [
-          'view_dashboard',
-          'view_invoices',
-          'view_payment_status',
-          'view_reports',
-          'download_bills',
-          'view_profile',
         ],
         'Staff': [
           'view_dashboard',
