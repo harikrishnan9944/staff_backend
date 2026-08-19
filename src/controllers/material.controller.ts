@@ -289,33 +289,31 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       project: projectId,
     });
 
-    // AUTOMATIC NOTIFICATION: New Material Created
+    // Fetch Project details (Name & Assigned Staff)
+    const targetProject = await Project.findById(projectId).select('name assignedUsers').lean();
+    const projectName = targetProject?.name || 'Project';
+    const projectAssignedUsers = targetProject?.assignedUsers || [];
+
+    const recipientSet = new Set<string>();
+    if (creatorId) recipientSet.add(creatorId.toString());
+    projectAssignedUsers.forEach((uId: any) => {
+      if (uId) recipientSet.add(uId.toString());
+    });
+
+    // AUTOMATIC NOTIFICATION: Material Created (Targeted ONLY to Project Assigned Staff)
     await sendNotificationToUser({
-      roles: ['Admin', 'Manager', 'Head of Operations', 'Staff'],
-      title: '📦 New Material Request Added',
-      message: `✨ Material "${materialName}" (${quantity} ${unit}) has been added for project. Ready for review & quotations!`,
+      recipientIds: Array.from(recipientSet),
+      roles: [],
+      title: '📦 New Material Created for Selection',
+      message: `New material '${materialName}' has been created for selection in project '${projectName}'. 🏢`,
       category: 'Material',
       data: {
         type: 'material_created',
         materialId: material._id.toString(),
         projectId: projectId.toString(),
+        projectName,
       },
     });
-
-    // AUTOMATIC NOTIFICATION: Task assigned (if assignedUser set on creation)
-    if (validAssignedUser) {
-      await sendNotificationToUser({
-        recipientIds: [validAssignedUser],
-        roles: ['Admin', 'Manager', 'Head of Operations', 'Staff'],
-        title: '📋 Task Assigned to You',
-        message: `⭐ You have been assigned to task/material "${materialName}".`,
-        category: 'Material',
-        data: {
-          type: 'task_assigned',
-          materialId: material._id.toString(),
-        },
-      });
-    }
 
     const populatedMaterial = await Material.findById(material._id)
       .populate('categoryId', 'name color')
@@ -415,42 +413,85 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     const newAssignedUser = material.assignedUser ? material.assignedUser.toString() : null;
     const isAssignmentChanged = newAssignedUser && newAssignedUser !== oldAssignedUser;
     const isStatusChanged = updates.status !== undefined && updates.status !== oldStatus;
-
-    if (isAssignmentChanged && newAssignedUser) {
-      await sendNotificationToUser({
-        recipientIds: [newAssignedUser],
-        title: 'Task Assigned',
-        message: `You have been assigned to task/material "${material.materialName}".`,
-        category: 'Material',
-        data: {
-          type: 'task_assigned',
-          materialId: material._id.toString(),
-        },
-        excludeUserId: user._id,
-      });
-    }
-
+    // Trigger Notifications for exact 6 allowed events
     if (isStatusChanged) {
-      const recipientIds: any[] = [];
-      if (material.createdBy) recipientIds.push(material.createdBy);
-      if (material.assignedUser) recipientIds.push(material.assignedUser);
+      const isSelection = ['Material Selection', 'Material Approve', 'Sectioned'].includes(material.status);
+      const isApprovalStage = material.status === 'Awaiting Approval';
+      const isPurchaseStage = ['Waiting for Purchase', 'Quotation Approved'].includes(material.status);
 
-      const isSelection = ['Material Approve', 'Sectioned', 'Material Selection'].includes(material.status);
+      // Fetch target project details
+      const targetProject = await Project.findById(material.projectId).select('name assignedUsers').lean();
+      const projectName = targetProject?.name || 'Project';
+      const projectAssignedUsers = targetProject?.assignedUsers || [];
 
-      await sendNotificationToUser({
-        recipientIds,
-        roles: ['Admin', 'Manager', 'Head of Operations', 'Staff'],
-        title: isSelection ? '🎯 Material Approved & Selected' : '🔄 Material Status Updated',
-        message: isSelection 
-          ? `✅ Material "${material.materialName}" was approved & selected for procurement!` 
-          : `📌 Material "${material.materialName}" status changed to "${material.status}".`,
-        category: 'Material',
-        data: {
-          type: isSelection ? 'material_selected' : 'task_status_changed',
-          materialId: material._id.toString(),
-          status: material.status,
-        },
+      const recipientSet = new Set<string>();
+      if (material.createdBy) recipientSet.add(material.createdBy.toString());
+      if (material.assignedUser) recipientSet.add(material.assignedUser.toString());
+      projectAssignedUsers.forEach((uId: any) => {
+        if (uId) recipientSet.add(uId.toString());
       });
+
+      const isQuotationStage = material.status === 'Quotation Set';
+
+      if (isSelection) {
+        // Notification 2: Material Selection Successful
+        await sendNotificationToUser({
+          recipientIds: Array.from(recipientSet),
+          roles: [],
+          title: '📋 Material Selection Completed',
+          message: `Material '${material.materialName}' selection completed for project '${projectName}' and is ready to quote. 📜`,
+          category: 'Material',
+          data: {
+            type: 'material_selected',
+            materialId: material._id.toString(),
+            materialName: material.materialName,
+            projectName,
+          },
+        });
+      } else if (isQuotationStage) {
+        // Notification: Material Ready for Quotation
+        await sendNotificationToUser({
+          recipientIds: Array.from(recipientSet),
+          roles: [],
+          title: '📜 Ready for Quotation',
+          message: `Material '${material.materialName}' for project '${projectName}' is ready for quotation. 🏢`,
+          category: 'Quotation',
+          data: {
+            type: 'material_ready_for_quotation',
+            materialId: material._id.toString(),
+            materialName: material.materialName,
+            projectName,
+          },
+        });
+      } else if (isApprovalStage) {
+        // Notification 3: Material Ready for Approval (Send only to approvers)
+        await sendNotificationToUser({
+          roles: ['Admin', 'Manager', 'Head of Operations'],
+          title: '⏳ Ready for Approval',
+          message: `Material '${material.materialName}' for project '${projectName}' is ready for your approval. ✅`,
+          category: 'Material',
+          data: {
+            type: 'material_ready_for_approval',
+            materialId: material._id.toString(),
+            materialName: material.materialName,
+            projectName,
+          },
+        });
+      } else if (isPurchaseStage) {
+        // Notification 5: Material Sent to Purchase (Notify existing assigned Purchase Supervisor)
+        await sendNotificationToUser({
+          roles: ['Purchase Supervisor'],
+          title: '🛍️ Ready for Purchase',
+          message: `The approved material '${material.materialName}' for project '${projectName}' is now ready for purchase. 🚚`,
+          category: 'Purchase',
+          data: {
+            type: 'material_sent_to_purchase',
+            materialId: material._id.toString(),
+            materialName: material.materialName,
+            projectName,
+          },
+        });
+      }
     }
 
     res.status(200).json({

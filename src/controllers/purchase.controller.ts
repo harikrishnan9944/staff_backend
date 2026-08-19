@@ -194,20 +194,32 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
     await Material.findByIdAndUpdate(materialId, { status: 'Purchase Completed' });
 
     const populatedPurchase = await Purchase.findById(purchase._id)
-      .populate('projectId', 'name')
+      .populate('projectId', 'name assignedUsers')
       .populate('materialId', 'materialName materialImage')
       .populate('vendorId', 'name');
 
-    // AUTOMATIC NOTIFICATION: New purchase request created
+    const matName = (populatedPurchase?.materialId as any)?.materialName || 'Material';
+    const projName = (populatedPurchase?.projectId as any)?.name || 'Project';
+    const projAssignedUsers = (populatedPurchase?.projectId as any)?.assignedUsers || [];
+
+    const recipientSet = new Set<string>();
+    projAssignedUsers.forEach((uId: any) => {
+      if (uId) recipientSet.add(uId.toString());
+    });
+
+    // AUTOMATIC NOTIFICATION: Material Purchase Successful
     await sendNotificationToUser({
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      title: '🛒 Purchase Order Initiated',
-      message: `📄 PO #${purchaseOrderNumber} for ₹${finalAmount} has been generated and sent to vendor!`,
+      recipientIds: Array.from(recipientSet),
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor'],
+      title: '💰 Material Purchased Successfully',
+      message: `Material '${matName}' has been purchased successfully for project '${projName}'. ✅`,
       category: 'Purchase',
       data: {
-        type: 'purchase_request_created',
+        type: 'material_purchase_successful',
         purchaseId: purchase._id.toString(),
         purchaseOrderNumber,
+        materialName: matName,
+        projectName: projName,
       },
     });
 
@@ -423,41 +435,17 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
         project: purchase.projectId,
       });
 
-      // AUTOMATIC NOTIFICATION: Purchase status transition (Approved / Completed / Cancelled)
-      if (status === 'Completed') {
+      // AUTOMATIC NOTIFICATION: Material Purchase Successful
+      if (status === 'Completed' || status === 'Approved' || status === 'Ordered') {
         await sendNotificationToUser({
-          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-          title: '🥳 Purchase Completed Successfully!',
-          message: `🏆 Purchase Order #${purchase.purchaseOrderNumber} is fully delivered and completed! Great job team! 🎉`,
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor'],
+          title: 'Material Purchased Successfully',
+          message: 'The material has been purchased successfully.',
           category: 'Purchase',
           data: {
-            type: 'purchase_completed',
+            type: 'material_purchase_successful',
             purchaseId: purchase._id.toString(),
             purchaseOrderNumber: purchase.purchaseOrderNumber,
-          },
-        });
-      } else if (status === 'Approved' || status === 'Ordered') {
-        await sendNotificationToUser({
-          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-          title: '✅ Purchase Order Approved',
-          message: `🚚 Purchase Order #${purchase.purchaseOrderNumber} status set to ${status}. Goods on the way!`,
-          category: 'Purchase',
-          data: {
-            type: 'purchase_request_approved',
-            purchaseId: purchase._id.toString(),
-            status,
-          },
-        });
-      } else if (status === 'Cancelled') {
-        await sendNotificationToUser({
-          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-          title: '🚫 Purchase Order Cancelled',
-          message: `⚠️ Purchase Order #${purchase.purchaseOrderNumber} was cancelled.`,
-          category: 'Purchase',
-          data: {
-            type: 'purchase_request_rejected',
-            purchaseId: purchase._id.toString(),
-            status,
           },
         });
       }

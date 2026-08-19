@@ -148,19 +148,6 @@ export const createPayment = async (req: AuthRequest, res: Response): Promise<vo
       project: purchase.projectId,
     });
 
-    // AUTOMATIC NOTIFICATION: Payment Disbursed
-    await sendNotificationToUser({
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      title: '💸 Payment Disbursed',
-      message: `💵 Payment of ₹${amount} disbursed via ${paymentType} for PO #${purchase.purchaseOrderNumber}.`,
-      category: 'Payment',
-      data: {
-        type: 'payment_disbursed',
-        paymentId: payment._id.toString(),
-        amount,
-      },
-    });
-
     res.status(201).json({
       success: true,
       message: 'Payment completed successfully',

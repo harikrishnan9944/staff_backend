@@ -116,20 +116,6 @@ export const createDocument = async (req: AuthRequest, res: Response): Promise<v
       project: projectId,
     });
 
-    // AUTOMATIC NOTIFICATION: New Document Uploaded
-    await sendNotificationToUser({
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      title: 'New Document Uploaded',
-      message: `Document "${name}" was uploaded to folder "${folder}".`,
-      category: 'System',
-      data: {
-        type: 'document_uploaded',
-        documentId: doc._id.toString(),
-        name,
-        folder,
-      },
-    });
-
     res.status(201).json({
       success: true,
       message: 'Document uploaded successfully',

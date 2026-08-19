@@ -246,18 +246,6 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
 
     await user.save();
 
-    // AUTOMATIC NOTIFICATION: Important admin account update
-    await sendNotificationToUser({
-      recipientIds: [user._id],
-      title: 'Account Details Updated',
-      message: `Your account details / permissions have been updated by Administrator.`,
-      category: 'System',
-      data: {
-        type: 'admin_update',
-        userId: user._id.toString(),
-      },
-    });
-
     const updatedUser = await User.findById(id)
       .select('-password')
       .populate('createdBy', 'name username');
@@ -499,18 +487,18 @@ export const assignProjectStaff = async (req: AuthRequest, res: Response): Promi
     const targetProject = await Project.findById(projectId);
     const projectName = targetProject ? targetProject.name : 'Project';
 
-    // AUTOMATIC NOTIFICATION: Project Assigned to User
+    // AUTOMATIC NOTIFICATION: New Project Assigned
     await sendNotificationToUser({
       recipientIds: [userId],
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      title: '📋 Project & Task Assignment',
-      message: `⭐ Staff member '${targetUser.name}' was assigned to project "${projectName}" as ${role}. Let's build something awesome!`,
+      roles: [],
+      title: 'New Project Assigned',
+      message: `You have been assigned to project '${projectName}' as '${role}'.`,
       category: 'Project',
       data: {
         type: 'project_assigned',
         projectId: projectId.toString(),
-        targetUserId: userId.toString(),
-        role,
+        projectName: projectName,
+        role: role,
       },
     });
 

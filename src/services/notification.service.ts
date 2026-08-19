@@ -49,17 +49,20 @@ export class NotificationService {
         }
       });
 
-      // Query users by roles (default to ALL active roles so everyone receives notifications for any action)
-      const broadcastRoles = (roles.length > 0)
-        ? roles
-        : ['Admin', 'Head of Operations', 'Manager', 'Staff'];
-
-      const usersInRoles = await User.find(
-        { role: { $in: broadcastRoles }, isActive: true },
-        '_id'
-      ).lean();
-
-      usersInRoles.forEach((u) => targetUserIds.add(u._id.toString()));
+      // Query users by roles if specified, or broadcast if neither recipientIds nor roles given
+      if (roles.length > 0) {
+        const usersInRoles = await User.find(
+          { role: { $in: roles }, isActive: true },
+          '_id'
+        ).lean();
+        usersInRoles.forEach((u) => targetUserIds.add(u._id.toString()));
+      } else if (recipientIds.length === 0) {
+        const defaultUsers = await User.find(
+          { role: { $in: ['Admin', 'Head of Operations', 'Manager', 'Staff'] }, isActive: true },
+          '_id'
+        ).lean();
+        defaultUsers.forEach((u) => targetUserIds.add(u._id.toString()));
+      }
 
       // If excludeUserId is explicitly provided, remove it, otherwise send to all target users
       if (excludeUserId) {

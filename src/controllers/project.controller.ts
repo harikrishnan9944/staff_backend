@@ -119,25 +119,26 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
           });
         }
       }
+
+      if (assignedUsers.length > 0) {
+        // AUTOMATIC NOTIFICATION: New Project Assigned
+        await sendNotificationToUser({
+          recipientIds: assignedUsers,
+          roles: [],
+          title: 'New Project Assigned',
+          message: `You have been assigned to project '${project.name}'.`,
+          category: 'Project',
+          data: {
+            type: 'project_assigned',
+            projectId: project._id.toString(),
+            projectName: project.name,
+          },
+        });
+      }
     }
 
     const populatedProject = await Project.findById(project._id)
       .populate('assignedUsers', 'name username role profileImage');
-
-    // AUTOMATIC NOTIFICATION: Project Created
-    if (assignedUsers && Array.isArray(assignedUsers) && assignedUsers.length > 0) {
-      await sendNotificationToUser({
-        recipientIds: assignedUsers,
-        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-        title: 'New Project Assigned',
-        message: `You have been assigned to project "${name}".`,
-        category: 'Project',
-        data: {
-          type: 'project_created',
-          projectId: project._id.toString(),
-        },
-      });
-    }
 
     res.status(201).json({
       success: true,
@@ -167,7 +168,16 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     }
     const oldStatus = project.status;
 
+    const oldUserIds = (project.assignedUsers || []).map((u: any) => u.toString());
+    const newlyAssignedIds: string[] = [];
+
     if (assignedUsers && Array.isArray(assignedUsers)) {
+      assignedUsers.forEach((uId: any) => {
+        if (!oldUserIds.includes(uId.toString())) {
+          newlyAssignedIds.push(uId.toString());
+        }
+      });
+
       const users = await User.find({ _id: { $in: assignedUsers } });
       const managers = users.filter(u => u.role === 'Manager');
       const opsHeads = users.filter(u => u.role === 'Head of Operations');
@@ -221,29 +231,24 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     const statusChanged = status !== undefined && status !== oldStatus;
     await project.save();
 
-    const populatedProject = await Project.findById(id)
-      .populate('assignedUsers', 'name username role profileImage');
-
-    // AUTOMATIC NOTIFICATION: Project status changed
-    if (statusChanged) {
-      const memberDocs = await ProjectMember.find({ projectId: project._id }, 'userId');
-      const memberIds = memberDocs.map((m) => m.userId);
-      const recipientIds = Array.from(new Set([...(project.assignedUsers || []), ...memberIds]));
-
+    if (newlyAssignedIds.length > 0) {
+      // AUTOMATIC NOTIFICATION: New Project Assigned
       await sendNotificationToUser({
-        recipientIds,
-        roles: ['Admin', 'Manager'],
-        title: 'Project Status Changed',
-        message: `Project "${project.name}" status changed to "${status}".`,
+        recipientIds: newlyAssignedIds,
+        roles: [],
+        title: 'New Project Assigned',
+        message: `You have been assigned to project '${project.name}'.`,
         category: 'Project',
         data: {
-          type: 'project_status_changed',
+          type: 'project_assigned',
           projectId: project._id.toString(),
-          status,
+          projectName: project.name,
         },
-        excludeUserId: req.user?._id,
       });
     }
+
+    const populatedProject = await Project.findById(id)
+      .populate('assignedUsers', 'name username role profileImage');
 
     res.status(200).json({
       success: true,

@@ -174,36 +174,9 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
       lastUpdatedDate: new Date(),
     });
 
-    // AUTOMATIC NOTIFICATION: Bill / Invoice Uploaded
-    await sendNotificationToUser({
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      title: '🧾 New Bill & Invoice Uploaded',
-      message: `📎 Invoice #${invoiceNumber} (₹${totalAmount}) has been uploaded and linked to PO!`,
-      category: 'Payment',
-      data: {
-        type: 'bill_uploaded',
-        invoiceId: invoice._id.toString(),
-        invoiceNumber,
-      },
-    });
-
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate('projectId', 'name')
       .populate('purchaseId', 'purchaseOrderNumber');
-
-    // AUTOMATIC NOTIFICATION: New bill uploaded
-    await sendNotificationToUser({
-      roles: ['Accountant', 'Admin', 'Manager'],
-      title: 'New Bill Uploaded',
-      message: `Invoice/Bill #${invoiceNumber} of amount ${totalAmount} has been uploaded.`,
-      category: 'Payment',
-      data: {
-        type: 'bill_uploaded',
-        invoiceId: invoice._id.toString(),
-        invoiceNumber,
-      },
-      excludeUserId: user?._id,
-    });
 
     res.status(201).json({
       success: true,

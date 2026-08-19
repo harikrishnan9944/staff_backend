@@ -17,6 +17,7 @@ import settingsRoutes from './routes/settings.routes';
 import quotationRoutes from './routes/quotation.routes';
 import projectRoutes from './routes/project.routes';
 import categoryRoutes from './routes/category.routes';
+import notificationRoutes from './routes/notification.routes';
 import { checkHealth } from './controllers/health.controller';
 
 // Load environment variables
@@ -30,9 +31,9 @@ connectDB();
 
 // Middlewares
 app.use(cors({
-  origin: '*', // Allow all origins for mobile clients
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: '*', // Allow all origins for mobile and web clients
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -63,6 +64,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/health', checkHealth);

@@ -98,18 +98,32 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       );
     }
 
-    // AUTOMATIC NOTIFICATION: New quotation created / approved
-    await sendNotificationToUser({
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      title: quotation.status === 'Approved' ? '🎉 Quotation Approved!' : '📝 New Quotation Received',
-      message: `💰 Quotation for material "${material.materialName}" from vendor "${vendor}" (₹${amount}) has been ${quotation.status === 'Approved' ? 'approved & ready' : 'submitted for review'}!`,
-      category: 'Quotation',
-      data: {
-        type: quotation.status === 'Approved' ? 'quotation_approved' : 'quotation_created',
-        quotationId: quotation._id.toString(),
-        materialId: materialId.toString(),
-      },
-    });
+    // AUTOMATIC NOTIFICATION: Only trigger if quotation is approved
+    if (quotation.status === 'Approved') {
+      // Notification 4: Quotation Approved
+      await sendNotificationToUser({
+        title: 'Quotation Approved Successfully',
+        message: 'The quotation has been approved successfully.',
+        category: 'Quotation',
+        data: {
+          type: 'quotation_approved',
+          quotationId: quotation._id.toString(),
+          materialId: materialId.toString(),
+        },
+      });
+
+      // Notification 5: Material Sent to Purchase (Notify existing assigned Purchase Supervisor)
+      await sendNotificationToUser({
+        roles: ['Purchase Supervisor'],
+        title: 'Material Sent to Purchase',
+        message: 'The approved material is now ready for purchase.',
+        category: 'Purchase',
+        data: {
+          type: 'material_sent_to_purchase',
+          materialId: materialId.toString(),
+        },
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -261,44 +275,54 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
 
     await quotation.save();
 
-    // AUTOMATIC NOTIFICATION: Quotation Status Updates (Selected / Approved / Rejected)
+    // Fetch Material & Project details for notification context
+    const materialDoc = await Material.findById(quotation.materialId).select('materialName projectId').lean();
+    const matName = materialDoc?.materialName || 'Material';
+    const projDoc = materialDoc?.projectId ? await Project.findById(materialDoc.projectId).select('name assignedUsers').lean() : null;
+    const projName = projDoc?.name || 'Project';
+
+    // AUTOMATIC NOTIFICATION: Material Ready for Approval, Quotation Approved, Material Sent to Purchase
     if (status === 'Selected') {
-      const material = await Material.findById(quotation.materialId);
+      // Notification 3: Material Ready for Approval (Send only to approvers)
       await sendNotificationToUser({
-        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-        title: '🚀 Quotation Selected for Purchase',
-        message: `⚡ Quotation for "${material?.materialName || 'Material'}" was selected! Proceeding to Purchase Order creation.`,
+        roles: ['Admin', 'Manager', 'Head of Operations'],
+        title: '⏳ Ready for Approval',
+        message: `Quotation for material '${matName}' in project '${projName}' is ready for your approval. ✅`,
         category: 'Quotation',
         data: {
-          type: 'quotation_selected',
+          type: 'material_ready_for_approval',
           quotationId: quotation._id.toString(),
           materialId: quotation.materialId.toString(),
+          materialName: matName,
+          projectName: projName,
         },
       });
     } else if (status === 'Approved' || isNewRealQuote) {
-      const material = await Material.findById(quotation.materialId);
+      // Notification 4: Quotation Approved
       await sendNotificationToUser({
-        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-        title: '🎉 Quotation Approved!',
-        message: `✅ Quotation for "${material?.materialName || 'Material'}" has been approved. Procurement unlocked!`,
+        title: '🎉 Quotation Approved Successfully',
+        message: `Quotation for material '${matName}' in project '${projName}' has been approved successfully. ✅`,
         category: 'Quotation',
         data: {
           type: 'quotation_approved',
           quotationId: quotation._id.toString(),
           materialId: quotation.materialId.toString(),
+          materialName: matName,
+          projectName: projName,
         },
       });
-    } else if (status === 'Rejected') {
-      const material = await Material.findById(quotation.materialId);
+
+      // Notification 5: Material Sent to Purchase (Notify existing assigned Purchase Supervisor)
       await sendNotificationToUser({
-        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-        title: '❌ Quotation Rejected',
-        message: `⚠️ Quotation for "${material?.materialName || 'Material'}" was rejected. Please review alternative quotes.`,
-        category: 'Quotation',
+        roles: ['Purchase Supervisor'],
+        title: '🛍️ Ready for Purchase',
+        message: `The approved material '${matName}' for project '${projName}' is now ready for purchase. 🚚`,
+        category: 'Purchase',
         data: {
-          type: 'quotation_rejected',
-          quotationId: quotation._id.toString(),
+          type: 'material_sent_to_purchase',
           materialId: quotation.materialId.toString(),
+          materialName: matName,
+          projectName: projName,
         },
       });
     }
