@@ -36,16 +36,30 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
       projects.map(async (project) => {
         const members = await ProjectMember.find({ projectId: project._id })
           .populate('userId', 'name username role email phone profileImage employeeId department isActive');
+        
+        const memberUsers = members.map(m => {
+          if (m.userId) {
+            const uObj = (m.userId as any).toObject ? (m.userId as any).toObject() : m.userId;
+            return { ...uObj, role: m.role || uObj.role };
+          }
+          return null;
+        }).filter(Boolean);
+
+        const directUsers = await User.find({ _id: { $in: project.assignedUsers || [] } }, 'name username role email phone profileImage employeeId department isActive').lean();
+
+        const userMap = new Map();
+        [...directUsers, ...memberUsers].forEach((u: any) => {
+          if (u && (u._id || u.id)) {
+            userMap.set(String(u._id || u.id), u);
+          }
+        });
+
+        const mergedAssignedUsers = Array.from(userMap.values());
+
         return {
           ...project.toObject(),
-          assignedUsers: members.map(m => {
-            if (m.userId) {
-              const uObj = (m.userId as any).toObject ? (m.userId as any).toObject() : m.userId;
-              // Override role to project-specific role
-              return { ...uObj, role: m.role };
-            }
-            return null;
-          }).filter(Boolean)
+          assignedUsers: mergedAssignedUsers,
+          assignedStaff: mergedAssignedUsers,
         };
       })
     );
