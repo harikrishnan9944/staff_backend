@@ -27,8 +27,8 @@ router.use(authenticate);
 // Push token registration for logged-in user
 router.post('/push-token', updatePushToken);
 
-// Admin-only operations
-router.get('/', authorize(['Admin']), getUsers);
+// User directory & management operations
+router.get('/', getUsers);
 router.get('/audit-logs', authorize(['Admin']), getAuditLogs);
 router.get('/login-history', authorize(['Admin']), getLoginHistory);
 router.post('/', authorize(['Admin']), validateRequest(registerSchema), createUser);

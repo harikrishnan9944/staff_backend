@@ -77,15 +77,6 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    // Check if user is Admin or is requesting their own profile
-    if (currentUser.role !== 'Admin' && currentUser._id.toString() !== id) {
-      res.status(430).json({
-        success: false,
-        message: 'Forbidden: You are only allowed to read your own profile',
-      });
-      return;
-    }
-
     const user = await User.findById(id)
       .select('-password')
       .populate('createdBy', 'name username');
