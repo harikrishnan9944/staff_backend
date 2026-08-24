@@ -3,6 +3,7 @@ import { Quotation } from '../models/quotation.model';
 import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
 import { MaterialWorkflow } from '../models/workflow.model';
+import { ProjectMember } from '../models/projectMember.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { sendNotificationToUser } from '../services/notification.service';
 
@@ -12,7 +13,28 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
     const { materialId } = req.query;
     
     const query: any = {};
-    if (materialId && materialId !== 'undefined' && materialId !== 'null') {
+
+    if (req.user && req.user.role !== 'Admin') {
+      const memberships = await ProjectMember.find({ userId: req.user._id });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      
+      const directProjects = await Project.find({ assignedUsers: req.user._id });
+      const directProjectIds = directProjects.map((p: any) => p._id.toString());
+      
+      const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
+      const assignedMaterials = await Material.find({ projectId: { $in: userAssignedProjectIds } }, '_id').lean();
+      const assignedMaterialIds = assignedMaterials.map((m: any) => m._id.toString());
+
+      if (materialId && materialId !== 'undefined' && materialId !== 'null') {
+        if (!assignedMaterialIds.includes(String(materialId))) {
+          query.materialId = { $in: [] };
+        } else {
+          query.materialId = materialId;
+        }
+      } else {
+        query.materialId = { $in: assignedMaterialIds };
+      }
+    } else if (materialId && materialId !== 'undefined' && materialId !== 'null') {
       query.materialId = materialId;
     }
 

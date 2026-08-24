@@ -2,6 +2,7 @@ import { Response } from 'express';
 import mongoose from 'mongoose';
 import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
+import { ProjectMember } from '../models/projectMember.model';
 import { Activity } from '../models/activity.model';
 import { Quotation } from '../models/quotation.model';
 import { Purchase } from '../models/purchase.model';
@@ -135,7 +136,27 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
     const { projectId, categoryId, search, status, priority, brand, assignedUser, sort } = req.query;
 
     const query: any = {};
-    if (projectId && projectId !== 'undefined' && projectId !== 'null') {
+
+    // Filter materials by assigned projects for non-Admin roles
+    if (req.user && req.user.role !== 'Admin') {
+      const memberships = await ProjectMember.find({ userId: req.user._id });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      
+      const directProjects = await Project.find({ assignedUsers: req.user._id });
+      const directProjectIds = directProjects.map(p => p._id.toString());
+      
+      const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
+      
+      if (projectId && projectId !== 'undefined' && projectId !== 'null') {
+        if (!userAssignedProjectIds.includes(String(projectId))) {
+          query.projectId = { $in: [] };
+        } else {
+          query.projectId = projectId;
+        }
+      } else {
+        query.projectId = { $in: userAssignedProjectIds };
+      }
+    } else if (projectId && projectId !== 'undefined' && projectId !== 'null') {
       query.projectId = projectId;
     }
 

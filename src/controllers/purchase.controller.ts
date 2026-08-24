@@ -4,6 +4,8 @@ import { Purchase } from '../models/purchase.model';
 import { Activity } from '../models/activity.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Material } from '../models/material.model';
+import { Project } from '../models/project.model';
+import { ProjectMember } from '../models/projectMember.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { sendNotificationToUser } from '../services/notification.service';
 
@@ -35,6 +37,28 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
     const { search, status, vendor, project, materialId, sort } = req.query;
 
     const query: any = {};
+
+    if (req.user && req.user.role !== 'Admin') {
+      const memberships = await ProjectMember.find({ userId: req.user._id });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      
+      const directProjects = await Project.find({ assignedUsers: req.user._id });
+      const directProjectIds = directProjects.map((p: any) => p._id.toString());
+      
+      const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
+
+      if (project && project !== 'All') {
+        if (!userAssignedProjectIds.includes(String(project))) {
+          query.projectId = { $in: [] };
+        } else {
+          query.projectId = project;
+        }
+      } else {
+        query.projectId = { $in: userAssignedProjectIds };
+      }
+    } else if (project && project !== 'All') {
+      query.projectId = project;
+    }
 
     // 1. Search Query (PO Number, Project Name, Material Name, Vendor Name)
     if (search) {
