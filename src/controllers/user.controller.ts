@@ -14,6 +14,30 @@ import bcrypt from 'bcryptjs';
 // Admin only - Get all users with search, filter, and sort
 export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Seed default staff members if missing
+    const defaultStaffSeeds = [
+      { name: 'Krishnan', username: 'admin1', role: 'Staff', email: 'admin1@construction.com', employeeId: 'EMP-0001' },
+      { name: 'hari', username: 'hari_098', role: 'Staff', email: 'hari_098@construction.com', employeeId: 'EMP-0098' },
+      { name: 'Hari', username: 'hari_123', role: 'Staff', email: 'hari_123@construction.com', employeeId: 'EMP-0123' },
+    ];
+
+    for (const seed of defaultStaffSeeds) {
+      const exists = await User.findOne({ username: seed.username });
+      if (!exists) {
+        await User.create({
+          name: seed.name,
+          username: seed.username,
+          password: 'password123',
+          role: seed.role as any,
+          email: seed.email,
+          phone: '+15550000',
+          isActive: true,
+          employeeId: seed.employeeId,
+          department: 'Site Execution',
+        });
+      }
+    }
+
     const { search, role, status, sort } = req.query;
 
     const query: any = {};

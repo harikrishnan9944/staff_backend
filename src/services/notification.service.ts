@@ -49,22 +49,26 @@ export class NotificationService {
         }
       });
 
-      // Query users by roles if specified, or broadcast if neither recipientIds nor roles given
-      if (roles.length > 0) {
-        const usersInRoles = await User.find(
-          { role: { $in: roles }, isActive: true },
-          '_id'
-        ).lean();
-        usersInRoles.forEach((u) => targetUserIds.add(u._id.toString()));
-      } else if (recipientIds.length === 0) {
-        const defaultUsers = await User.find(
-          { role: { $in: ['Admin', 'Head of Operations', 'Manager', 'Staff'] }, isActive: true },
-          '_id'
-        ).lean();
-        defaultUsers.forEach((u) => targetUserIds.add(u._id.toString()));
+      // Determine target roles (if roles empty or broadcast requested, target all standard roles)
+      const validDbRoles = ['Admin', 'Head of Operations', 'Manager', 'Staff'];
+      let queryRoles: string[] = [];
+
+      if (roles && roles.length > 0) {
+        // Map custom roles (e.g. Supervisor, Purchase Supervisor, Architect) to Staff
+        const mapped = roles.map((r) => (validDbRoles.includes(r) ? r : 'Staff'));
+        queryRoles = Array.from(new Set(mapped));
+      } else {
+        // Default to all active roles
+        queryRoles = validDbRoles;
       }
 
-      // If excludeUserId is explicitly provided, remove it, otherwise send to all target users
+      const usersInRoles = await User.find(
+        { role: { $in: queryRoles }, isActive: true },
+        '_id'
+      ).lean();
+      usersInRoles.forEach((u) => targetUserIds.add(u._id.toString()));
+
+      // If excludeUserId is explicitly provided, remove it
       if (excludeUserId) {
         targetUserIds.delete(excludeUserId.toString());
       }

@@ -4,11 +4,11 @@ import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticate);
-
 // Public read access to materials
 router.get('/', getMaterials);
+
+// All mutation routes require authentication
+router.use(authenticate);
 
 // Full create/delete controls (All authenticated users can manage materials)
 router.post('/', createMaterial);

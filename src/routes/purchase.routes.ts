@@ -12,11 +12,11 @@ import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticate);
-
 router.get('/', getPurchases);
 router.get('/:id', getPurchaseById);
+
+// All mutation routes require authentication
+router.use(authenticate);
 
 const allRoles = ['Admin', 'Manager', 'Head of Operations', 'Purchase Supervisor', 'Accountant', 'Supervisor', 'Architect', 'Staff'];
 

@@ -58,7 +58,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       ]
     });
 
-    if (!user && (cleanIdentifier === 'admin' || cleanIdentifier === 'admin@construction.com' || username.trim().toUpperCase() === 'EMP-0001')) {
+    // If database is completely empty, seed default admin user
+    const totalUsers = await User.countDocuments();
+    if (totalUsers === 0 && (cleanIdentifier === 'admin' || cleanIdentifier === 'admin@construction.com')) {
       user = await User.create({
         name: 'Administrator',
         username: 'admin',
@@ -80,18 +82,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Check if active
     if (!user.isActive) {
-      res.status(403).json({ success: false, message: 'Your account is inactive. Please contact an admin.' });
+      res.status(403).json({ success: false, message: 'Account is deactivated. Please contact admin.' });
       return;
     }
 
     // Verify password
-    let isMatch = await user.comparePassword(password);
-    if (!isMatch && user.username === 'admin') {
-      user.password = password;
-      await user.save();
-      isMatch = true;
-    }
-
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       res.status(401).json({ success: false, message: 'Invalid username or password' });
       return;

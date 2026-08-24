@@ -300,18 +300,18 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       if (uId) recipientSet.add(uId.toString());
     });
 
-    // AUTOMATIC NOTIFICATION: Material Created (Targeted ONLY to Project Assigned Staff)
+    // AUTOMATIC NOTIFICATION: Material Created (Initial Stage — Broadcast to team)
     await sendNotificationToUser({
-      recipientIds: Array.from(recipientSet),
-      roles: [],
-      title: '📦 New Material Created for Selection',
-      message: `New material '${materialName}' has been created for selection in project '${projectName}'. 🏢`,
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Supervisor'],
+      title: '📋 Ready for Material Selection',
+      message: `New material '${materialName}' added for project '${projectName}' — Initial stage: Ready for selection. 📦`,
       category: 'Material',
       data: {
         type: 'material_created',
         materialId: material._id.toString(),
         projectId: projectId.toString(),
         projectName,
+        materialName,
       },
     });
 
@@ -464,11 +464,15 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
           },
         });
       } else if (isApprovalStage) {
-        // Notification 3: Material Ready for Approval (Send only to approvers)
+        // Notification: Material Sent for Re-Approval / Ready for Approval
+        const isReApprove = oldStatus === 'Quotation Approved' || (oldStatus as any) === 'Purchase';
         await sendNotificationToUser({
-          roles: ['Admin', 'Manager', 'Head of Operations'],
-          title: '⏳ Ready for Approval',
-          message: `Material '${material.materialName}' for project '${projectName}' is ready for your approval. ✅`,
+          roles: ['Admin', 'Manager', 'Head of Operations', 'Purchase Supervisor'],
+          recipientIds: Array.from(recipientSet),
+          title: isReApprove ? '🔄 Sent Back for Re-Approval' : '⏳ Ready for Approval',
+          message: isReApprove 
+            ? `Material '${material.materialName}' for project '${projectName}' was sent back for re-approval. ⏳`
+            : `Material '${material.materialName}' for project '${projectName}' is ready for your approval. ✅`,
           category: 'Material',
           data: {
             type: 'material_ready_for_approval',
@@ -477,10 +481,27 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
             projectName,
           },
         });
+      } else if (isQuotationStage || material.status === 'Material Selection') {
+        const isCancelled = oldStatus === 'Quotation Approved' || oldStatus === 'Awaiting Approval';
+        if (isCancelled) {
+          await sendNotificationToUser({
+            roles: ['Admin', 'Manager', 'Head of Operations', 'Staff', 'Supervisor'],
+            recipientIds: Array.from(recipientSet),
+            title: '❌ Quotation Approval Cancelled',
+            message: `Quotation approval for material '${material.materialName}' was cancelled and returned to Quotation Selection. 📋`,
+            category: 'Quotation',
+            data: {
+              type: 'quotation_approval_cancelled',
+              materialId: material._id.toString(),
+              materialName: material.materialName,
+              projectName,
+            },
+          });
+        }
       } else if (isPurchaseStage) {
-        // Notification 5: Material Sent to Purchase (Notify existing assigned Purchase Supervisor)
+        // Notification 5: Material Sent to Purchase
         await sendNotificationToUser({
-          roles: ['Purchase Supervisor'],
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
           title: '🛍️ Ready for Purchase',
           message: `The approved material '${material.materialName}' for project '${projectName}' is now ready for purchase. 🚚`,
           category: 'Purchase',

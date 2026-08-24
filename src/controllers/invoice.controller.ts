@@ -4,6 +4,7 @@ import { Purchase } from '../models/purchase.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Activity } from '../models/activity.model';
 import { Material } from '../models/material.model';
+import { Project } from '../models/project.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { uploadToCloudinary } from '../config/cloudinary';
 import { sendNotificationToUser } from '../services/notification.service';
@@ -177,6 +178,27 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
     const populatedInvoice = await Invoice.findById(invoice._id)
       .populate('projectId', 'name')
       .populate('purchaseId', 'purchaseOrderNumber');
+
+    const matDoc = await Material.findById(purchase.materialId).select('materialName').lean();
+    const matName = matDoc?.materialName || 'Material';
+    const projDoc = await Project.findById(purchase.projectId).select('name').lean();
+    const projName = projDoc?.name || 'Project';
+
+    // AUTOMATIC NOTIFICATION: Bill Receipt Uploaded
+    await sendNotificationToUser({
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      title: '📄 Bill Receipt Uploaded',
+      message: `Bill/Invoice '${invoiceNumber}' of ₹${Number(invoiceAmount).toLocaleString()} uploaded for '${matName}' in project '${projName}'. 💳`,
+      category: 'Purchase',
+      data: {
+        type: 'bill_uploaded',
+        invoiceId: invoice._id.toString(),
+        purchaseId: purchase._id.toString(),
+        invoiceNumber,
+        materialName: matName,
+        projectName: projName,
+      },
+    });
 
     res.status(201).json({
       success: true,

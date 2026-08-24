@@ -9,10 +9,10 @@ import { authenticate } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authenticate);
-
 router.get('/', getProjects);
+
+// All mutation routes require authentication
+router.use(authenticate);
 router.post('/', createProject);
 router.put('/:id', updateProject);
 router.delete('/:id', deleteProject);

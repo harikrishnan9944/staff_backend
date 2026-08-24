@@ -81,6 +81,18 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
     if (isRFQ) {
       // Transition Material status to 'Quotation Set'
       await Material.findByIdAndUpdate(materialId, { status: 'Quotation Set' });
+      
+      await sendNotificationToUser({
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        title: '📄 New Quotation Requested',
+        message: `Quotation request created for material '${material.materialName}' — Ready for supplier rates. 📋`,
+        category: 'Quotation',
+        data: {
+          type: 'quotation_requested',
+          materialId: materialId.toString(),
+          materialName: material.materialName,
+        },
+      });
     } else {
       // Transition Material status to 'Quotation Approved' directly
       await Material.findByIdAndUpdate(materialId, { 
@@ -96,14 +108,27 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         { status: 'Waiting for Purchase', currentStage: 'Purchase', progress: 60 },
         { upsert: true }
       );
+
+      await sendNotificationToUser({
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        title: '📄 New Quotation Uploaded',
+        message: `Quotation of ₹${Number(amount).toLocaleString()} from '${vendor}' uploaded for '${material.materialName}'. 📜`,
+        category: 'Quotation',
+        data: {
+          type: 'quotation_created',
+          quotationId: quotation._id.toString(),
+          materialId: materialId.toString(),
+          materialName: material.materialName,
+        },
+      });
     }
 
     // AUTOMATIC NOTIFICATION: Only trigger if quotation is approved
     if (quotation.status === 'Approved') {
       // Notification 4: Quotation Approved
       await sendNotificationToUser({
-        title: 'Quotation Approved Successfully',
-        message: 'The quotation has been approved successfully.',
+        title: '🎉 Quotation Approved Successfully',
+        message: `Quotation for material '${material.materialName}' has been approved and is ready for purchase! ✅`,
         category: 'Quotation',
         data: {
           type: 'quotation_approved',
@@ -112,15 +137,16 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         },
       });
 
-      // Notification 5: Material Sent to Purchase (Notify existing assigned Purchase Supervisor)
+      // Notification 5: Material Sent to Purchase
       await sendNotificationToUser({
-        roles: ['Purchase Supervisor'],
-        title: 'Material Sent to Purchase',
-        message: 'The approved material is now ready for purchase.',
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
+        title: '🛍️ Ready for Purchase',
+        message: `Material '${material.materialName}' is approved — Ready for purchase. 🚚`,
         category: 'Purchase',
         data: {
           type: 'material_sent_to_purchase',
           materialId: materialId.toString(),
+          materialName: material.materialName,
         },
       });
     }
@@ -312,11 +338,11 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
         },
       });
 
-      // Notification 5: Material Sent to Purchase (Notify existing assigned Purchase Supervisor)
+      // Notification 5: Material Sent to Purchase
       await sendNotificationToUser({
-        roles: ['Purchase Supervisor'],
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
         title: '🛍️ Ready for Purchase',
-        message: `The approved material '${matName}' for project '${projName}' is now ready for purchase. 🚚`,
+        message: `Quotation approved for material '${matName}' in project '${projName}' — Ready for purchase. 🚚`,
         category: 'Purchase',
         data: {
           type: 'material_sent_to_purchase',
