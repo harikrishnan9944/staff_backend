@@ -7,7 +7,7 @@ import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { uploadToCloudinary } from '../config/cloudinary';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 
 // GET /api/invoices
 // Authenticated user - Retrieve list of invoices with search, filter, and sort
@@ -183,9 +183,11 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
     const matName = matDoc?.materialName || 'Material';
     const projDoc = await Project.findById(purchase.projectId).select('name').lean();
     const projName = projDoc?.name || 'Project';
+    const recipientIds = await NotificationService.getProjectInvolvedUserIds(purchase.projectId);
 
     // AUTOMATIC NOTIFICATION: Bill Receipt Uploaded
     await sendNotificationToUser({
+      recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
       title: '📄 Bill Receipt Uploaded',
       message: `Bill/Invoice '${invoiceNumber}' of ₹${Number(invoiceAmount).toLocaleString()} uploaded for '${matName}' in project '${projName}'. 💳`,

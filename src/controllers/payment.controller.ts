@@ -3,7 +3,7 @@ import { Payment } from '../models/payment.model';
 import { Purchase } from '../models/purchase.model';
 import { Activity } from '../models/activity.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 
 // Helper to recalculate and sync linked Purchase Order payment status
 const syncPurchasePaymentStatus = async (purchaseId: string): Promise<void> => {
@@ -144,8 +144,25 @@ export const createPayment = async (req: AuthRequest, res: Response): Promise<vo
     // Create log
     await Activity.create({
       user: user?._id,
-      action: `Disbursed payment of $${amount} via ${paymentType} for PO '${purchase.purchaseOrderNumber}'`,
+      action: `Disbursed payment of ₹${amount} via ${paymentType} for PO '${purchase.purchaseOrderNumber}'`,
       project: purchase.projectId,
+    });
+
+    const recipientIds = await NotificationService.getProjectInvolvedUserIds(purchase.projectId);
+
+    // AUTOMATIC NOTIFICATION: Payment Disbursed
+    await sendNotificationToUser({
+      recipientIds,
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Accountant'],
+      title: '💳 Payment Disbursed',
+      message: `Payment of ₹${Number(amount).toLocaleString()} (${paymentType}) completed for PO '${purchase.purchaseOrderNumber}'. 💰`,
+      category: 'Payment',
+      data: {
+        type: 'payment_disbursed',
+        paymentId: payment._id.toString(),
+        purchaseId: purchaseId.toString(),
+        amount,
+      },
     });
 
     res.status(201).json({

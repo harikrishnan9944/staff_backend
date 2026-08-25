@@ -3,7 +3,7 @@ import { Project } from '../models/project.model';
 import { ProjectMember } from '../models/projectMember.model';
 import { User } from '../models/user.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 import { Material } from '../models/material.model';
 import { Quotation } from '../models/quotation.model';
 import { Purchase } from '../models/purchase.model';
@@ -138,9 +138,9 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
         // AUTOMATIC NOTIFICATION: New Project Assigned
         await sendNotificationToUser({
           recipientIds: assignedUsers,
-          roles: [],
-          title: 'New Project Assigned',
-          message: `You have been assigned to project '${project.name}'.`,
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          title: '🏗️ Project Assigned',
+          message: `You have been assigned to project '${project.name}'. 🏗️`,
           category: 'Project',
           data: {
             type: 'project_assigned',
@@ -249,9 +249,9 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       // AUTOMATIC NOTIFICATION: New Project Assigned
       await sendNotificationToUser({
         recipientIds: newlyAssignedIds,
-        roles: [],
-        title: 'New Project Assigned',
-        message: `You have been assigned to project '${project.name}'.`,
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        title: '🏗️ Project Assigned',
+        message: `You have been assigned to project '${project.name}'. 🏗️`,
         category: 'Project',
         data: {
           type: 'project_assigned',

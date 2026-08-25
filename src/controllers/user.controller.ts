@@ -497,9 +497,9 @@ export const assignProjectStaff = async (req: AuthRequest, res: Response): Promi
     // AUTOMATIC NOTIFICATION: New Project Assigned
     await sendNotificationToUser({
       recipientIds: [userId],
-      roles: [],
-      title: 'New Project Assigned',
-      message: `You have been assigned to project '${projectName}' as '${role}'.`,
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      title: '🏗️ Project Assigned',
+      message: `You have been assigned to project '${projectName}' as '${role}'. 🏗️`,
       category: 'Project',
       data: {
         type: 'project_assigned',

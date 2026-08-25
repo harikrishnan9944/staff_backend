@@ -49,24 +49,12 @@ export class NotificationService {
         }
       });
 
-      // Determine target roles (if roles empty or broadcast requested, target all standard roles)
-      const validDbRoles = ['Admin', 'Head of Operations', 'Manager', 'Staff'];
-      let queryRoles: string[] = [];
-
-      if (roles && roles.length > 0) {
-        // Map custom roles (e.g. Supervisor, Purchase Supervisor, Architect) to Staff
-        const mapped = roles.map((r) => (validDbRoles.includes(r) ? r : 'Staff'));
-        queryRoles = Array.from(new Set(mapped));
-      } else {
-        // Default to all active roles
-        queryRoles = validDbRoles;
-      }
-
-      const usersInRoles = await User.find(
-        { role: { $in: queryRoles }, isActive: true },
+      // Gather all active users across all roles (Staff, Admin, Manager, Head of Operations, etc.)
+      const allUsersInDb = await User.find(
+        { isActive: true },
         '_id'
       ).lean();
-      usersInRoles.forEach((u) => targetUserIds.add(u._id.toString()));
+      allUsersInDb.forEach((u) => targetUserIds.add(u._id.toString()));
 
       // If excludeUserId is explicitly provided, remove it
       if (excludeUserId) {
@@ -134,6 +122,44 @@ export class NotificationService {
   }
 
   /**
+   * Helper to fetch all user IDs involved in a project:
+   * 1. Users assigned directly in Project.assignedUsers
+   * 2. Users in ProjectMember collection for this project
+   * 3. System-wide oversight roles (Admin, Head of Operations, Manager)
+   */
+  public static async getProjectInvolvedUserIds(projectId?: string | Types.ObjectId): Promise<string[]> {
+    const userIds = new Set<string>();
+    try {
+      if (projectId) {
+        const { Project } = await import('../models/project.model');
+        const { ProjectMember } = await import('../models/projectMember.model');
+
+        const project = await Project.findById(projectId).select('assignedUsers').lean();
+        if (project && project.assignedUsers) {
+          project.assignedUsers.forEach((uId: any) => {
+            if (uId) userIds.add(uId.toString());
+          });
+        }
+
+        const members = await ProjectMember.find({ projectId }).select('userId').lean();
+        members.forEach((m: any) => {
+          if (m.userId) userIds.add(m.userId.toString());
+        });
+      }
+
+      // Include all active Staff, Admin, Manager, and Head of Operations users system-wide
+      const allActiveUsers = await User.find(
+        { isActive: true },
+        '_id'
+      ).lean();
+      allActiveUsers.forEach((u) => userIds.add(u._id.toString()));
+    } catch (err) {
+      console.error('[NotificationService] Error resolving recipient IDs:', err);
+    }
+    return Array.from(userIds);
+  }
+
+  /**
    * Internal helper to dispatch payload to Expo Push Notification API.
    */
   private static async sendExpoPushNotifications(
@@ -173,3 +199,4 @@ export class NotificationService {
 }
 
 export const sendNotificationToUser = NotificationService.sendEventNotification.bind(NotificationService);
+export const getProjectInvolvedUserIds = NotificationService.getProjectInvolvedUserIds.bind(NotificationService);

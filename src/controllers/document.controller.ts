@@ -3,7 +3,7 @@ import { DocumentFile } from '../models/document.model';
 import { Activity } from '../models/activity.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { uploadToCloudinary } from '../config/cloudinary';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 
 // Get storage usage summary
 export const getStorageUsage = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -115,6 +115,23 @@ export const createDocument = async (req: AuthRequest, res: Response): Promise<v
       action: `Uploaded Document '${name}' to folder '${folder}'`,
       project: projectId,
     });
+
+    if (projectId) {
+      const recipientIds = await NotificationService.getProjectInvolvedUserIds(projectId);
+      await sendNotificationToUser({
+        recipientIds,
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        title: '📁 New Document Uploaded',
+        message: `New document '${name}' uploaded to '${folder}' folder. 📄`,
+        category: 'Project',
+        data: {
+          type: 'document_uploaded',
+          documentId: doc._id.toString(),
+          projectId: projectId.toString(),
+          documentName: name,
+        },
+      });
+    }
 
     res.status(201).json({
       success: true,

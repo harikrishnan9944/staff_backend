@@ -7,7 +7,7 @@ import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
 import { ProjectMember } from '../models/projectMember.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 
 // Helper to generate a collision-proof unique PO number: PO-YYYYMMDD-XXXX
 const generatePONumber = async (): Promise<string> => {
@@ -224,16 +224,11 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
 
     const matName = (populatedPurchase?.materialId as any)?.materialName || 'Material';
     const projName = (populatedPurchase?.projectId as any)?.name || 'Project';
-    const projAssignedUsers = (populatedPurchase?.projectId as any)?.assignedUsers || [];
-
-    const recipientSet = new Set<string>();
-    projAssignedUsers.forEach((uId: any) => {
-      if (uId) recipientSet.add(uId.toString());
-    });
+    const recipientIds = await NotificationService.getProjectInvolvedUserIds(projectId);
 
     // AUTOMATIC NOTIFICATION: Material Purchase Successful
     await sendNotificationToUser({
-      recipientIds: Array.from(recipientSet),
+      recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor'],
       title: '💰 Material Purchased Successfully',
       message: `Material '${matName}' has been purchased successfully for project '${projName}'. ✅`,

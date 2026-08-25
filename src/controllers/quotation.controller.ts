@@ -5,7 +5,7 @@ import { Project } from '../models/project.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { ProjectMember } from '../models/projectMember.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 
 // GET /api/quotations
 export const getQuotations = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -80,7 +80,15 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    if (['Registered', 'Material Selection', 'Material Approve', 'Sectioned'].includes(material.status) && !material.stayAtSelection) {
+    if (material.stayAtSelection) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Materials marked with Stay at Selection remain strictly in Selection stage and cannot advance to Quotations.' 
+      });
+      return;
+    }
+
+    if (['Registered', 'Material Selection', 'Material Approve', 'Sectioned'].includes(material.status)) {
       res.status(400).json({ 
         success: false, 
         message: 'Material request must be approved by Manager/Admin (Quotation Set) before adding quotations.' 
@@ -100,11 +108,14 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       transportCharges: transportCharges !== undefined ? Number(transportCharges) : 0,
     });
 
+    const projectRecipientIds = await NotificationService.getProjectInvolvedUserIds(material.projectId);
+
     if (isRFQ) {
       // Transition Material status to 'Quotation Set'
       await Material.findByIdAndUpdate(materialId, { status: 'Quotation Set' });
       
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         title: '📄 New Quotation Requested',
         message: `Quotation request created for material '${material.materialName}' — Ready for supplier rates. 📋`,
@@ -132,6 +143,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       );
 
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         title: '📄 New Quotation Uploaded',
         message: `Quotation of ₹${Number(amount).toLocaleString()} from '${vendor}' uploaded for '${material.materialName}'. 📜`,
@@ -149,6 +161,8 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
     if (quotation.status === 'Approved') {
       // Notification 4: Quotation Approved
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         title: '🎉 Quotation Approved Successfully',
         message: `Quotation for material '${material.materialName}' has been approved and is ready for purchase! ✅`,
         category: 'Quotation',
@@ -161,6 +175,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
 
       // Notification 5: Material Sent to Purchase
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
         title: '🛍️ Ready for Purchase',
         message: `Material '${material.materialName}' is approved — Ready for purchase. 🚚`,
@@ -326,13 +341,18 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     // Fetch Material & Project details for notification context
     const materialDoc = await Material.findById(quotation.materialId).select('materialName projectId').lean();
     const matName = materialDoc?.materialName || 'Material';
-    const projDoc = materialDoc?.projectId ? await Project.findById(materialDoc.projectId).select('name assignedUsers').lean() : null;
+    const projDoc = materialDoc?.projectId ? await Project.findById(materialDoc.projectId).select('name').lean() : null;
     const projName = projDoc?.name || 'Project';
+
+    const projectRecipientIds = materialDoc?.projectId 
+      ? await NotificationService.getProjectInvolvedUserIds(materialDoc.projectId)
+      : [];
 
     // AUTOMATIC NOTIFICATION: Material Ready for Approval, Quotation Approved, Material Sent to Purchase
     if (status === 'Selected') {
-      // Notification 3: Material Ready for Approval (Send only to approvers)
+      // Notification 3: Material Ready for Approval (Send to approvers & project members)
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
         roles: ['Admin', 'Manager', 'Head of Operations'],
         title: '⏳ Ready for Approval',
         message: `Quotation for material '${matName}' in project '${projName}' is ready for your approval. ✅`,
@@ -348,6 +368,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     } else if (status === 'Approved' || isNewRealQuote) {
       // Notification 4: Quotation Approved
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
+        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         title: '🎉 Quotation Approved Successfully',
         message: `Quotation for material '${matName}' in project '${projName}' has been approved successfully. ✅`,
         category: 'Quotation',
@@ -362,6 +384,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
 
       // Notification 5: Material Sent to Purchase
       await sendNotificationToUser({
+        recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
         title: '🛍️ Ready for Purchase',
         message: `Quotation approved for material '${matName}' in project '${projName}' — Ready for purchase. 🚚`,

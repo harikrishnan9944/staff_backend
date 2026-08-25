@@ -310,19 +310,14 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
       project: projectId,
     });
 
-    // Fetch Project details (Name & Assigned Staff)
-    const targetProject = await Project.findById(projectId).select('name assignedUsers').lean();
+    // Fetch Project details (Name) & resolve all involved recipient user IDs
+    const targetProject = await Project.findById(projectId).select('name').lean();
     const projectName = targetProject?.name || 'Project';
-    const projectAssignedUsers = targetProject?.assignedUsers || [];
+    const recipientIds = await NotificationService.getProjectInvolvedUserIds(projectId);
 
-    const recipientSet = new Set<string>();
-    if (creatorId) recipientSet.add(creatorId.toString());
-    projectAssignedUsers.forEach((uId: any) => {
-      if (uId) recipientSet.add(uId.toString());
-    });
-
-    // AUTOMATIC NOTIFICATION: Material Created (Initial Stage — Broadcast to team)
+    // AUTOMATIC NOTIFICATION: Material Created (Initial Stage — Broadcast to project team)
     await sendNotificationToUser({
+      recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Supervisor'],
       title: '📋 Ready for Material Selection',
       message: `New material '${materialName}' added for project '${projectName}' — Initial stage: Ready for selection. 📦`,
@@ -385,7 +380,10 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.estimatedCost !== undefined) material.estimatedCost = updates.estimatedCost;
     if (updates.vendorId !== undefined) material.vendorId = (updates.vendorId && updates.vendorId !== 'undefined' && updates.vendorId !== 'null' && updates.vendorId !== '') ? updates.vendorId : undefined;
     if (updates.priority !== undefined) material.priority = updates.priority;
-    if (updates.status !== undefined) {
+    if (updates.stayAtSelection !== undefined) material.stayAtSelection = updates.stayAtSelection;
+    if (material.stayAtSelection) {
+      material.status = 'Material Selection';
+    } else if (updates.status !== undefined) {
       material.status = updates.status;
       if (updates.status === 'Material Approve') {
         (material as any).sectionedDate = new Date();
@@ -405,7 +403,6 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
     if (updates.section !== undefined) material.section = updates.section;
     if (updates.vendorName !== undefined) material.vendorName = updates.vendorName;
     if (updates.transportCharges !== undefined) material.transportCharges = updates.transportCharges;
-    if (updates.stayAtSelection !== undefined) material.stayAtSelection = updates.stayAtSelection;
 
     // Log last editor metrics
     material.lastUpdatedBy = user._id;
@@ -443,14 +440,10 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
       // Fetch target project details
       const targetProject = await Project.findById(material.projectId).select('name assignedUsers').lean();
       const projectName = targetProject?.name || 'Project';
-      const projectAssignedUsers = targetProject?.assignedUsers || [];
-
-      const recipientSet = new Set<string>();
+      const projectRecipientIds = await NotificationService.getProjectInvolvedUserIds(material.projectId);
+      const recipientSet = new Set<string>(projectRecipientIds);
       if (material.createdBy) recipientSet.add(material.createdBy.toString());
       if (material.assignedUser) recipientSet.add(material.assignedUser.toString());
-      projectAssignedUsers.forEach((uId: any) => {
-        if (uId) recipientSet.add(uId.toString());
-      });
 
       const isQuotationStage = material.status === 'Quotation Set';
 
@@ -458,7 +451,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         // Notification 2: Material Selection Successful
         await sendNotificationToUser({
           recipientIds: Array.from(recipientSet),
-          roles: [],
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
           title: '📋 Material Selection Completed',
           message: `Material '${material.materialName}' selection completed for project '${projectName}' and is ready to quote. 📜`,
           category: 'Material',
@@ -473,7 +466,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         // Notification: Material Ready for Quotation
         await sendNotificationToUser({
           recipientIds: Array.from(recipientSet),
-          roles: [],
+          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
           title: '📜 Ready for Quotation',
           message: `Material '${material.materialName}' for project '${projectName}' is ready for quotation. 🏢`,
           category: 'Quotation',
