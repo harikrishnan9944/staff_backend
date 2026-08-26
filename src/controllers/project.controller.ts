@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { Project } from '../models/project.model';
 import { ProjectMember } from '../models/projectMember.model';
 import { User } from '../models/user.model';
@@ -20,14 +21,27 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
 
     // Filter projects by assignment for non-Admin roles
     if (user && user.role !== 'Admin') {
-      const memberships = await ProjectMember.find({ userId: user._id });
+      const userIdStr = user._id.toString();
+      const userObjId = new mongoose.Types.ObjectId(userIdStr);
+
+      const memberships = await ProjectMember.find({
+        $or: [
+          { userId: userObjId },
+          { userId: userIdStr }
+        ]
+      });
       const memberProjectIds = memberships.map(m => m.projectId.toString());
-      
-      const directProjects = await Project.find({ assignedUsers: user._id });
+
+      const directProjects = await Project.find({
+        $or: [
+          { assignedUsers: userObjId },
+          { assignedUsers: userIdStr }
+        ]
+      });
       const directProjectIds = directProjects.map(p => p._id.toString());
-      
+
       const uniqueProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
-      query._id = { $in: uniqueProjectIds };
+      query._id = { $in: uniqueProjectIds.map(id => new mongoose.Types.ObjectId(id)) };
     }
 
     const projects = await Project.find(query).sort({ createdAt: -1 });

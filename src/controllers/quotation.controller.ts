@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { Quotation } from '../models/quotation.model';
 import { Material } from '../models/material.model';
 import { Project } from '../models/project.model';
@@ -15,27 +16,44 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
     const query: any = {};
 
     if (req.user && req.user.role !== 'Admin') {
-      const memberships = await ProjectMember.find({ userId: req.user._id });
+      const userIdStr = req.user._id.toString();
+      const userObjId = new mongoose.Types.ObjectId(userIdStr);
+
+      const memberships = await ProjectMember.find({
+        $or: [
+          { userId: userObjId },
+          { userId: userIdStr }
+        ]
+      });
       const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
-      
-      const directProjects = await Project.find({ assignedUsers: req.user._id });
+
+      const directProjects = await Project.find({
+        $or: [
+          { assignedUsers: userObjId },
+          { assignedUsers: userIdStr }
+        ]
+      });
       const directProjectIds = directProjects.map((p: any) => p._id.toString());
-      
+
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
-      const assignedMaterials = await Material.find({ projectId: { $in: userAssignedProjectIds } }, '_id').lean();
-      const assignedMaterialIds = assignedMaterials.map((m: any) => m._id.toString());
+      const userAssignedProjectObjIds = userAssignedProjectIds.map(id => new mongoose.Types.ObjectId(id));
+
+      const assignedMaterials = await Material.find({ projectId: { $in: userAssignedProjectObjIds } }, '_id').lean();
+      const assignedMaterialObjIds = assignedMaterials.map((m: any) => m._id);
 
       if (materialId && materialId !== 'undefined' && materialId !== 'null') {
-        if (!assignedMaterialIds.includes(String(materialId))) {
+        const matIdStr = String(materialId);
+        const hasMat = assignedMaterials.some((m: any) => m._id.toString() === matIdStr);
+        if (!hasMat) {
           query.materialId = { $in: [] };
         } else {
-          query.materialId = materialId;
+          query.materialId = new mongoose.Types.ObjectId(matIdStr);
         }
       } else {
-        query.materialId = { $in: assignedMaterialIds };
+        query.materialId = { $in: assignedMaterialObjIds };
       }
     } else if (materialId && materialId !== 'undefined' && materialId !== 'null') {
-      query.materialId = materialId;
+      query.materialId = new mongoose.Types.ObjectId(String(materialId));
     }
 
     const quotations = await Quotation.find(query)

@@ -11,7 +11,7 @@ export const registerSchema = z.object({
     .string({ required_error: 'Password is required' })
     .min(6, 'Password must be at least 6 characters'),
   role: z.enum(
-    ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+    ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Accountant', 'Supervisor', 'Architect'],
     { errorMap: () => ({ message: 'Invalid role provided' }) }
   ),
   email: z.string({ required_error: 'Email is required' }).email('Invalid email address'),

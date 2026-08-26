@@ -139,25 +139,39 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
 
     // Filter materials by assigned projects for non-Admin roles
     if (req.user && req.user.role !== 'Admin') {
-      const memberships = await ProjectMember.find({ userId: req.user._id });
+      const userIdStr = req.user._id.toString();
+      const userObjId = new mongoose.Types.ObjectId(userIdStr);
+
+      const memberships = await ProjectMember.find({
+        $or: [
+          { userId: userObjId },
+          { userId: userIdStr }
+        ]
+      });
       const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
-      
-      const directProjects = await Project.find({ assignedUsers: req.user._id });
+
+      const directProjects = await Project.find({
+        $or: [
+          { assignedUsers: userObjId },
+          { assignedUsers: userIdStr }
+        ]
+      });
       const directProjectIds = directProjects.map(p => p._id.toString());
-      
+
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
-      
+      const userAssignedProjectObjIds = userAssignedProjectIds.map(id => new mongoose.Types.ObjectId(id));
+
       if (projectId && projectId !== 'undefined' && projectId !== 'null') {
         if (!userAssignedProjectIds.includes(String(projectId))) {
           query.projectId = { $in: [] };
         } else {
-          query.projectId = projectId;
+          query.projectId = new mongoose.Types.ObjectId(String(projectId));
         }
       } else {
-        query.projectId = { $in: userAssignedProjectIds };
+        query.projectId = { $in: userAssignedProjectObjIds };
       }
     } else if (projectId && projectId !== 'undefined' && projectId !== 'null') {
-      query.projectId = projectId;
+      query.projectId = new mongoose.Types.ObjectId(String(projectId));
     }
 
     if (categoryId && categoryId !== 'undefined' && categoryId !== 'null') {

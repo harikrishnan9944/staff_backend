@@ -39,25 +39,40 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
     const query: any = {};
 
     if (req.user && req.user.role !== 'Admin') {
-      const memberships = await ProjectMember.find({ userId: req.user._id });
-      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
-      
-      const directProjects = await Project.find({ assignedUsers: req.user._id });
-      const directProjectIds = directProjects.map((p: any) => p._id.toString());
-      
-      const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
+      const userIdStr = req.user._id.toString();
+      const userObjId = new mongoose.Types.ObjectId(userIdStr);
 
-      if (project && project !== 'All') {
-        if (!userAssignedProjectIds.includes(String(project))) {
+      const memberships = await ProjectMember.find({
+        $or: [
+          { userId: userObjId },
+          { userId: userIdStr }
+        ]
+      });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+
+      const directProjects = await Project.find({
+        $or: [
+          { assignedUsers: userObjId },
+          { assignedUsers: userIdStr }
+        ]
+      });
+      const directProjectIds = directProjects.map((p: any) => p._id.toString());
+
+      const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
+      const userAssignedProjectObjIds = userAssignedProjectIds.map(id => new mongoose.Types.ObjectId(id));
+
+      if (project && project !== 'All' && project !== 'undefined' && project !== 'null') {
+        const projStr = String(project);
+        if (!userAssignedProjectIds.includes(projStr)) {
           query.projectId = { $in: [] };
         } else {
-          query.projectId = project;
+          query.projectId = new mongoose.Types.ObjectId(projStr);
         }
       } else {
-        query.projectId = { $in: userAssignedProjectIds };
+        query.projectId = { $in: userAssignedProjectObjIds };
       }
-    } else if (project && project !== 'All') {
-      query.projectId = project;
+    } else if (project && project !== 'All' && project !== 'undefined' && project !== 'null') {
+      query.projectId = new mongoose.Types.ObjectId(String(project));
     }
 
     // 1. Search Query (PO Number, Project Name, Material Name, Vendor Name)

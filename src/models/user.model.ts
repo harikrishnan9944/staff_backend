@@ -5,7 +5,15 @@ export interface IUser extends Document {
   name: string;
   username: string;
   password: string;
-  role: 'Admin' | 'Head of Operations' | 'Manager' | 'Staff';
+  role:
+    | 'Admin'
+    | 'Head of Operations'
+    | 'Manager'
+    | 'Staff'
+    | 'Purchase Supervisor'
+    | 'Accountant'
+    | 'Supervisor'
+    | 'Architect';
   email: string;
   phone?: string;
   profileImage?: string;
@@ -58,6 +66,10 @@ const UserSchema = new Schema<IUser>(
           'Head of Operations',
           'Manager',
           'Staff',
+          'Purchase Supervisor',
+          'Accountant',
+          'Supervisor',
+          'Architect',
         ],
         message: '{VALUE} is not a valid role',
       },
