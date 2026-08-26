@@ -185,7 +185,17 @@ export class NotificationService {
     data: Record<string, any>
   ): Promise<void> {
     try {
-      const messages = tokens.map((token) => ({
+      // Validate push tokens format
+      const validTokens = tokens.filter(
+        (t) => typeof t === 'string' && t.trim().length > 0 && (t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken') || t.includes('['))
+      );
+
+      if (validTokens.length === 0) {
+        console.log('[NotificationService] No valid push tokens to dispatch.');
+        return;
+      }
+
+      const messages = validTokens.map((token) => ({
         to: token,
         sound: 'default',
         title,
@@ -208,8 +218,29 @@ export class NotificationService {
         body: JSON.stringify(messages),
       });
 
-      const responseData = await response.json();
-      console.log('[NotificationService] Expo Push API response status:', response.status, responseData);
+      const responseData: any = await response.json();
+      console.log(`[NotificationService] Expo Push API status: ${response.status}`, responseData);
+
+      // Parse tickets and safely prune unregistered tokens from DB
+      if (responseData && Array.isArray(responseData.data)) {
+        const invalidTokens: string[] = [];
+        responseData.data.forEach((ticket: any, index: number) => {
+          if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
+            const badToken = validTokens[index];
+            if (badToken) invalidTokens.push(badToken);
+          }
+        });
+
+        if (invalidTokens.length > 0) {
+          console.log('[NotificationService] Pruning invalid/unregistered Expo push tokens from DB:', invalidTokens);
+          await User.updateMany(
+            { $or: [{ pushToken: { $in: invalidTokens } }, { pushTokens: { $in: invalidTokens } }] },
+            {
+              $pull: { pushTokens: { $in: invalidTokens } } as any,
+            }
+          );
+        }
+      }
     } catch (err) {
       // Log Expo push failure without interrupting callers
       console.error('[NotificationService] Expo Push API request error (isolated):', err);

@@ -673,3 +673,44 @@ export const updatePushToken = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
+// POST /api/users/remove-push-token
+export const removePushToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    const { pushToken } = req.body;
+
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    if (!pushToken || typeof pushToken !== 'string') {
+      res.status(400).json({ success: false, message: 'pushToken is required' });
+      return;
+    }
+
+    const tokenClean = pushToken.trim();
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $pull: { pushTokens: tokenClean },
+      }
+    );
+
+    const dbUser = await User.findById(user._id);
+    if (dbUser && dbUser.pushToken === tokenClean) {
+      dbUser.pushToken = dbUser.pushTokens && dbUser.pushTokens.length > 0 ? dbUser.pushTokens[dbUser.pushTokens.length - 1] : undefined;
+      await dbUser.save();
+    }
+
+    console.log(`[PushToken] Removed token for user '${user.username}': ${tokenClean}`);
+    res.status(200).json({
+      success: true,
+      message: 'Push token removed successfully',
+    });
+  } catch (error) {
+    console.error('removePushToken error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
