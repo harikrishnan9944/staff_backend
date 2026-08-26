@@ -15,6 +15,7 @@ import {
   getLoginHistory,
   updatePushToken,
   removePushToken,
+  testPushNotification,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateRequest } from '../middlewares/validate.middleware';
@@ -25,9 +26,10 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
-// Push token registration & removal for logged-in user
+// Push token registration, removal & test endpoint for logged-in user
 router.post('/push-token', updatePushToken);
 router.post('/remove-push-token', removePushToken);
+router.post('/test-push', testPushNotification);
 
 // User directory & management operations
 router.get('/', getUsers);

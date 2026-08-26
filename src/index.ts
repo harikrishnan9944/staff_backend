@@ -66,6 +66,12 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/notifications', notificationRoutes);
 
+import { authenticate } from './middlewares/auth.middleware';
+import { testPushNotification } from './controllers/user.controller';
+
+// Test Push Endpoint (Step 9)
+app.post('/api/test/push', authenticate, testPushNotification);
+
 // Health check endpoint
 app.get('/health', checkHealth);
 

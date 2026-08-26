@@ -672,6 +672,92 @@ export const updatePushToken = async (req: AuthRequest, res: Response): Promise<
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
+// POST /api/users/test-push or POST /api/test/push
+export const testPushNotification = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { targetUserId, title, body } = req.body || {};
+    const recipientId = targetUserId || user._id;
+
+    const dbUser = await User.findById(recipientId).select('name username role email pushToken pushTokens');
+    if (!dbUser) {
+      res.status(404).json({ success: false, message: 'Recipient user not found' });
+      return;
+    }
+
+    const tokensSet = new Set<string>();
+    if (dbUser.pushToken && typeof dbUser.pushToken === 'string' && dbUser.pushToken.trim()) {
+      tokensSet.add(dbUser.pushToken.trim());
+    }
+    if (Array.isArray(dbUser.pushTokens)) {
+      dbUser.pushTokens.forEach((pt) => {
+        if (pt && typeof pt === 'string' && pt.trim()) tokensSet.add(pt.trim());
+      });
+    }
+
+    const tokens = Array.from(tokensSet);
+    console.log(`[TestPush] Testing push notification for user '${dbUser.username}' (${dbUser.name}), tokens found:`, tokens);
+
+    if (tokens.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'No push tokens found for user in MongoDB',
+        user: { id: dbUser._id, username: dbUser.username, name: dbUser.name },
+        tokensFound: 0,
+      });
+      return;
+    }
+
+    const messages = tokens.map((token) => ({
+      to: token,
+      sound: 'default',
+      title: title || 'Push Test 🚀',
+      body: body || 'If you see this, Expo push delivery is working.',
+      data: { type: 'test_push', timestamp: new Date().toISOString() },
+      priority: 'high',
+      channelId: 'default',
+      badge: 1,
+      _displayInForeground: true,
+    }));
+
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(messages),
+    });
+
+    const responseData: any = await response.json();
+    console.log(`[TestPush] Expo Push API status: ${response.status}`, JSON.stringify(responseData, null, 2));
+
+    let tickets: any[] = [];
+    if (responseData && Array.isArray(responseData.data)) {
+      tickets = responseData.data;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Test push notification dispatched to Expo Push API',
+      recipient: { id: dbUser._id, username: dbUser.username, name: dbUser.name },
+      tokenFound: true,
+      tokens,
+      expoHttpStatus: response.status,
+      expoResponse: responseData,
+      tickets,
+    });
+  } catch (error: any) {
+    console.error('[TestPush] Error sending test push:', error);
+    res.status(500).json({ success: false, message: error?.message || 'Internal server error' });
+  }
+};
 
 // POST /api/users/remove-push-token
 export const removePushToken = async (req: AuthRequest, res: Response): Promise<void> => {

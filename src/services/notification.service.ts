@@ -116,6 +116,10 @@ export class NotificationService {
         }
       }
 
+      console.log(`NOTIFICATION TRIGGERED: "${title}"`);
+      console.log(`RECIPIENT USER IDS: [${finalUserIds.join(', ')}]`);
+      console.log(`RECIPIENT PUSH TOKENS: [${Array.from(pushTokensSet).join(', ')}]`);
+
       // 3. Save notifications to database for in-app feeds
       if (dbNotificationDocs.length > 0) {
         await Notification.insertMany(dbNotificationDocs);
@@ -125,11 +129,9 @@ export class NotificationService {
       const pushTokens = Array.from(pushTokensSet);
       if (pushTokens.length > 0) {
         await this.sendExpoPushNotifications(pushTokens, title, message, data);
+      } else {
+        console.log('[NotificationService] No push tokens found for recipients. Database notifications saved.');
       }
-
-      console.log(
-        `[NotificationService] Successfully processed notification "${title}" for ${finalUserIds.length} user(s) and ${pushTokens.length} push token(s).`
-      );
     } catch (error) {
       // FAILURE ISOLATION: Log error and do NOT throw, ensuring business operation stays successful!
       console.error('[NotificationService] Failed to send push notification (isolated):', error);
@@ -195,6 +197,8 @@ export class NotificationService {
         return;
       }
 
+      console.log(`EXPO PUSH REQUEST STARTED for ${validTokens.length} token(s)`);
+
       const messages = validTokens.map((token) => ({
         to: token,
         sound: 'default',
@@ -219,10 +223,13 @@ export class NotificationService {
       });
 
       const responseData: any = await response.json();
-      console.log(`[NotificationService] Expo Push API status: ${response.status}`, responseData);
+      console.log(`EXPO RESPONSE: Status ${response.status}`, JSON.stringify(responseData));
 
       // Parse tickets and safely prune unregistered tokens from DB
       if (responseData && Array.isArray(responseData.data)) {
+        const ticketIds = responseData.data.map((t: any) => t.id || t.status).filter(Boolean);
+        console.log(`EXPO TICKET IDS: [${ticketIds.join(', ')}]`);
+
         const invalidTokens: string[] = [];
         responseData.data.forEach((ticket: any, index: number) => {
           if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
