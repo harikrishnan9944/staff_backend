@@ -121,6 +121,7 @@ export const createDocument = async (req: AuthRequest, res: Response): Promise<v
       await sendNotificationToUser({
         recipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        excludeUserId: user?._id,
         title: '📁 New Document Uploaded',
         message: `New document '${name}' uploaded to '${folder}' folder. 📄`,
         category: 'Project',

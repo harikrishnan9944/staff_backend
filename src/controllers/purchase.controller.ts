@@ -230,6 +230,7 @@ export const createPurchase = async (req: AuthRequest, res: Response): Promise<v
     await sendNotificationToUser({
       recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor'],
+      excludeUserId: req.user?._id,
       title: '💰 Material Purchased Successfully',
       message: `Material '${matName}' has been purchased successfully for project '${projName}'. ✅`,
       category: 'Purchase',
@@ -458,6 +459,7 @@ export const updateStatus = async (req: AuthRequest, res: Response): Promise<voi
       if (status === 'Completed' || status === 'Approved' || status === 'Ordered') {
         await sendNotificationToUser({
           roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor'],
+          excludeUserId: user._id,
           title: 'Material Purchased Successfully',
           message: 'The material has been purchased successfully.',
           category: 'Purchase',

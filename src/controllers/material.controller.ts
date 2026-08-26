@@ -11,7 +11,7 @@ import { DocumentFile } from '../models/document.model';
 import { MaterialWorkflow } from '../models/workflow.model';
 import { Payment } from '../models/payment.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { sendNotificationToUser } from '../services/notification.service';
+import { sendNotificationToUser, NotificationService } from '../services/notification.service';
 
 const syncMaterialRelatedRecords = async (material: any, userId: any) => {
   try {
@@ -319,6 +319,7 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
     await sendNotificationToUser({
       recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Supervisor'],
+      excludeUserId: user?._id,
       title: '📋 Ready for Material Selection',
       message: `New material '${materialName}' added for project '${projectName}' — Initial stage: Ready for selection. 📦`,
       category: 'Material',
@@ -452,6 +453,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         await sendNotificationToUser({
           recipientIds: Array.from(recipientSet),
           roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          excludeUserId: user._id,
           title: '📋 Material Selection Completed',
           message: `Material '${material.materialName}' selection completed for project '${projectName}' and is ready to quote. 📜`,
           category: 'Material',
@@ -467,6 +469,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         await sendNotificationToUser({
           recipientIds: Array.from(recipientSet),
           roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          excludeUserId: user._id,
           title: '📜 Ready for Quotation',
           message: `Material '${material.materialName}' for project '${projectName}' is ready for quotation. 🏢`,
           category: 'Quotation',
@@ -483,6 +486,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         await sendNotificationToUser({
           roles: ['Admin', 'Manager', 'Head of Operations', 'Purchase Supervisor'],
           recipientIds: Array.from(recipientSet),
+          excludeUserId: user._id,
           title: isReApprove ? '🔄 Sent Back for Re-Approval' : '⏳ Ready for Approval',
           message: isReApprove 
             ? `Material '${material.materialName}' for project '${projectName}' was sent back for re-approval. ⏳`
@@ -501,6 +505,7 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
           await sendNotificationToUser({
             roles: ['Admin', 'Manager', 'Head of Operations', 'Staff', 'Supervisor'],
             recipientIds: Array.from(recipientSet),
+            excludeUserId: user._id,
             title: '❌ Quotation Approval Cancelled',
             message: `Quotation approval for material '${material.materialName}' was cancelled and returned to Quotation Selection. 📋`,
             category: 'Quotation',
@@ -516,6 +521,8 @@ export const updateMaterial = async (req: AuthRequest, res: Response): Promise<v
         // Notification 5: Material Sent to Purchase
         await sendNotificationToUser({
           roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
+          recipientIds: Array.from(recipientSet),
+          excludeUserId: user._id,
           title: '🛍️ Ready for Purchase',
           message: `The approved material '${material.materialName}' for project '${projectName}' is now ready for purchase. 🚚`,
           category: 'Purchase',

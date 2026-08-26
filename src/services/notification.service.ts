@@ -49,16 +49,30 @@ export class NotificationService {
         }
       });
 
-      // Gather all active users across all roles (Staff, Admin, Manager, Head of Operations, etc.)
-      const allUsersInDb = await User.find(
-        { isActive: true },
-        '_id'
-      ).lean();
-      allUsersInDb.forEach((u) => targetUserIds.add(u._id.toString()));
+      // If specific roles are specified, add active users matching those roles
+      if (roles && roles.length > 0) {
+        const usersByRole = await User.find(
+          { role: { $in: roles }, isActive: { $ne: false } },
+          '_id'
+        ).lean();
+        usersByRole.forEach((u) => targetUserIds.add(u._id.toString()));
+      }
 
-      // If excludeUserId is explicitly provided, remove it
-      if (excludeUserId) {
-        targetUserIds.delete(excludeUserId.toString());
+      // If target set is empty OR only contains the excluded actor, broadcast to all active users system-wide
+      const actorIdStr = excludeUserId ? excludeUserId.toString() : null;
+      const isOnlyActor = actorIdStr && targetUserIds.size === 1 && targetUserIds.has(actorIdStr);
+
+      if (targetUserIds.size === 0 || isOnlyActor) {
+        const allUsersInDb = await User.find(
+          { isActive: { $ne: false } },
+          '_id'
+        ).lean();
+        allUsersInDb.forEach((u) => targetUserIds.add(u._id.toString()));
+      }
+
+      // Explicitly remove actor (excludeUserId) so the action performer does not get self-popups
+      if (actorIdStr) {
+        targetUserIds.delete(actorIdStr);
       }
 
       const finalUserIds = Array.from(targetUserIds);
@@ -69,7 +83,7 @@ export class NotificationService {
 
       // 2. Fetch users with push token info
       const users = await User.find(
-        { _id: { $in: finalUserIds }, isActive: true },
+        { _id: { $in: finalUserIds }, isActive: { $ne: false } },
         '_id pushToken pushTokens'
       ).lean();
 
@@ -149,7 +163,7 @@ export class NotificationService {
 
       // Include all active Staff, Admin, Manager, and Head of Operations users system-wide
       const allActiveUsers = await User.find(
-        { isActive: true },
+        { isActive: { $ne: false } },
         '_id'
       ).lean();
       allActiveUsers.forEach((u) => userIds.add(u._id.toString()));

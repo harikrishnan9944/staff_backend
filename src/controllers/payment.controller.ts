@@ -154,6 +154,7 @@ export const createPayment = async (req: AuthRequest, res: Response): Promise<vo
     await sendNotificationToUser({
       recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Accountant'],
+      excludeUserId: user?._id,
       title: '💳 Payment Disbursed',
       message: `Payment of ₹${Number(amount).toLocaleString()} (${paymentType}) completed for PO '${purchase.purchaseOrderNumber}'. 💰`,
       category: 'Payment',

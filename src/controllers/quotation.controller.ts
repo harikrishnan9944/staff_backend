@@ -117,6 +117,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        excludeUserId: req.user?._id,
         title: '📄 New Quotation Requested',
         message: `Quotation request created for material '${material.materialName}' — Ready for supplier rates. 📋`,
         category: 'Quotation',
@@ -145,6 +146,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        excludeUserId: req.user?._id,
         title: '📄 New Quotation Uploaded',
         message: `Quotation of ₹${Number(amount).toLocaleString()} from '${vendor}' uploaded for '${material.materialName}'. 📜`,
         category: 'Quotation',
@@ -163,6 +165,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        excludeUserId: req.user?._id,
         title: '🎉 Quotation Approved Successfully',
         message: `Quotation for material '${material.materialName}' has been approved and is ready for purchase! ✅`,
         category: 'Quotation',
@@ -177,6 +180,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
+        excludeUserId: req.user?._id,
         title: '🛍️ Ready for Purchase',
         message: `Material '${material.materialName}' is approved — Ready for purchase. 🚚`,
         category: 'Purchase',
@@ -354,6 +358,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Manager', 'Head of Operations'],
+        excludeUserId: req.user?._id,
         title: '⏳ Ready for Approval',
         message: `Quotation for material '${matName}' in project '${projName}' is ready for your approval. ✅`,
         category: 'Quotation',
@@ -370,6 +375,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        excludeUserId: req.user?._id,
         title: '🎉 Quotation Approved Successfully',
         message: `Quotation for material '${matName}' in project '${projName}' has been approved successfully. ✅`,
         category: 'Quotation',
@@ -386,6 +392,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
+        excludeUserId: req.user?._id,
         title: '🛍️ Ready for Purchase',
         message: `Quotation approved for material '${matName}' in project '${projName}' — Ready for purchase. 🚚`,
         category: 'Purchase',

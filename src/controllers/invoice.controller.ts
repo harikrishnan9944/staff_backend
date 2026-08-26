@@ -189,6 +189,7 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<vo
     await sendNotificationToUser({
       recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+      excludeUserId: user?._id,
       title: '📄 Bill Receipt Uploaded',
       message: `Bill/Invoice '${invoiceNumber}' of ₹${Number(invoiceAmount).toLocaleString()} uploaded for '${matName}' in project '${projName}'. 💳`,
       category: 'Purchase',

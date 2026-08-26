@@ -139,6 +139,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
         await sendNotificationToUser({
           recipientIds: assignedUsers,
           roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+          excludeUserId: req.user?._id,
           title: '🏗️ Project Assigned',
           message: `You have been assigned to project '${project.name}'. 🏗️`,
           category: 'Project',
@@ -250,6 +251,7 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       await sendNotificationToUser({
         recipientIds: newlyAssignedIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
+        excludeUserId: req.user?._id,
         title: '🏗️ Project Assigned',
         message: `You have been assigned to project '${project.name}'. 🏗️`,
         category: 'Project',
