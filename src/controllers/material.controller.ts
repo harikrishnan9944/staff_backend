@@ -315,13 +315,13 @@ export const createMaterial = async (req: AuthRequest, res: Response): Promise<v
     const projectName = targetProject?.name || 'Project';
     const recipientIds = await NotificationService.getProjectInvolvedUserIds(projectId);
 
-    // AUTOMATIC NOTIFICATION: Material Created (Initial Stage — Broadcast to project team)
+    // AUTOMATIC NOTIFICATION: Material Created (Broadcast to assigned project team & management)
     await sendNotificationToUser({
       recipientIds,
       roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Supervisor'],
       excludeUserId: user?._id,
-      title: '📋 Ready for Material Selection',
-      message: `New material '${materialName}' added for project '${projectName}' — Initial stage: Ready for selection. 📦`,
+      title: `📦 Material Created at ${projectName}`,
+      message: `New material '${materialName}' created at '${projectName}'. 📦`,
       category: 'Material',
       data: {
         type: 'material_created',

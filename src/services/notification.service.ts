@@ -49,25 +49,32 @@ export class NotificationService {
         }
       });
 
-      // If specific roles are specified, add active users matching those roles
+      // If specific roles are specified:
+      // When recipientIds are explicitly passed for a project event, filter roles so only oversight roles (Admin, Manager, Head of Operations) are added system-wide, while Staff users are restricted to those in recipientIds.
       if (roles && roles.length > 0) {
-        const usersByRole = await User.find(
-          { role: { $in: roles }, isActive: { $ne: false } },
-          '_id'
-        ).lean();
-        usersByRole.forEach((u) => targetUserIds.add(u._id.toString()));
+        let filterRoles = roles;
+        if (recipientIds.length > 0) {
+          filterRoles = roles.filter((r) => ['Admin', 'Manager', 'Head of Operations'].includes(r));
+        }
+        if (filterRoles.length > 0) {
+          const usersByRole = await User.find(
+            { role: { $in: filterRoles }, isActive: { $ne: false } },
+            '_id'
+          ).lean();
+          usersByRole.forEach((u) => targetUserIds.add(u._id.toString()));
+        }
       }
 
-      // If target set is empty OR only contains the excluded actor, broadcast to all active users system-wide
+      // If target set is empty OR only contains the excluded actor, broadcast to oversight roles (Admin, Manager, Head of Operations)
       const actorIdStr = excludeUserId ? excludeUserId.toString() : null;
       const isOnlyActor = actorIdStr && targetUserIds.size === 1 && targetUserIds.has(actorIdStr);
 
       if (targetUserIds.size === 0 || isOnlyActor) {
-        const allUsersInDb = await User.find(
-          { isActive: { $ne: false } },
+        const oversightUsers = await User.find(
+          { role: { $in: ['Admin', 'Manager', 'Head of Operations'] }, isActive: { $ne: false } },
           '_id'
         ).lean();
-        allUsersInDb.forEach((u) => targetUserIds.add(u._id.toString()));
+        oversightUsers.forEach((u) => targetUserIds.add(u._id.toString()));
       }
 
       // Explicitly remove actor (excludeUserId) so the action performer does not get self-popups
@@ -136,10 +143,11 @@ export class NotificationService {
   }
 
   /**
-   * Helper to fetch all user IDs involved in a project:
+   * Helper to fetch user IDs involved in a project:
    * 1. Users assigned directly in Project.assignedUsers
    * 2. Users in ProjectMember collection for this project
    * 3. System-wide oversight roles (Admin, Head of Operations, Manager)
+   * Note: Staff users NOT assigned to this project are strictly excluded.
    */
   public static async getProjectInvolvedUserIds(projectId?: string | Types.ObjectId): Promise<string[]> {
     const userIds = new Set<string>();
@@ -161,12 +169,12 @@ export class NotificationService {
         });
       }
 
-      // Include all active Staff, Admin, Manager, and Head of Operations users system-wide
-      const allActiveUsers = await User.find(
-        { isActive: { $ne: false } },
+      // Include oversight management roles system-wide (Admin, Manager, Head of Operations)
+      const oversightUsers = await User.find(
+        { role: { $in: ['Admin', 'Manager', 'Head of Operations'] }, isActive: { $ne: false } },
         '_id'
       ).lean();
-      allActiveUsers.forEach((u) => userIds.add(u._id.toString()));
+      oversightUsers.forEach((u) => userIds.add(u._id.toString()));
     } catch (err) {
       console.error('[NotificationService] Error resolving recipient IDs:', err);
     }
@@ -190,6 +198,9 @@ export class NotificationService {
         body,
         data,
         priority: 'high',
+        channelId: 'default',
+        badge: 1,
+        _displayInForeground: true,
       }));
 
       // Expo Push API endpoint
