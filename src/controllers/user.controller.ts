@@ -739,19 +739,70 @@ export const testPushNotification = async (req: AuthRequest, res: Response): Pro
     console.log(`[TestPush] Expo Push API status: ${response.status}`, JSON.stringify(responseData, null, 2));
 
     let tickets: any[] = [];
+    let ticketIds: string[] = [];
     if (responseData && Array.isArray(responseData.data)) {
       tickets = responseData.data;
+      ticketIds = tickets.map((t: any) => t.id).filter((id: any) => typeof id === 'string' && id.length > 0);
     }
+
+    // Query Expo Push Receipts API to verify delivery state
+    let receiptStatus = 'PENDING';
+    let receiptError = 'NONE';
+    let receiptDetails: any = null;
+    let expoReceipts: any = null;
+
+    if (ticketIds.length > 0) {
+      try {
+        // Short pause to allow Expo server receipt processing
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const receiptResponse = await fetch('https://exp.host/--/api/v2/push/getReceipts', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Accept-Encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ids: ticketIds }),
+        });
+
+        const receiptData: any = await receiptResponse.json();
+        expoReceipts = receiptData?.data || {};
+        console.log('[TestPush] Expo Receipts API response:', JSON.stringify(receiptData, null, 2));
+
+        const firstTicketId = ticketIds[0];
+        const ticketReceipt = expoReceipts[firstTicketId];
+        if (ticketReceipt) {
+          if (ticketReceipt.status === 'ok') {
+            receiptStatus = 'OK';
+            receiptError = 'NONE';
+          } else if (ticketReceipt.status === 'error') {
+            receiptStatus = 'ERROR';
+            receiptError = ticketReceipt.message || ticketReceipt.details?.error || 'Unknown Expo push delivery error';
+            receiptDetails = ticketReceipt.details || null;
+          }
+        }
+      } catch (receiptErr) {
+        console.error('[TestPush] Receipts fetch skipped:', receiptErr);
+      }
+    }
+
+    const firstTicket = tickets[0] || {};
+    const primaryTicketId = firstTicket.id || firstTicket.status || 'N/A';
 
     res.status(200).json({
       success: true,
-      message: 'Test push notification dispatched to Expo Push API',
+      message: receiptStatus === 'OK' ? 'Push accepted by Expo/FCM for device delivery' : `Push ticket created (${primaryTicketId}), receipt status: ${receiptStatus}`,
       recipient: { id: dbUser._id, username: dbUser.username, name: dbUser.name },
       tokenFound: true,
       tokens,
       expoHttpStatus: response.status,
       expoResponse: responseData,
+      ticketId: primaryTicketId,
       tickets,
+      receiptStatus,
+      receiptError,
+      receiptDetails,
+      expoReceipts,
     });
   } catch (error: any) {
     console.error('[TestPush] Error sending test push:', error);
