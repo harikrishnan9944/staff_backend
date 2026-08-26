@@ -65,11 +65,8 @@ export class NotificationService {
         }
       }
 
-      // If target set is empty OR only contains the excluded actor, broadcast to oversight roles (Admin, Manager, Head of Operations)
-      const actorIdStr = excludeUserId ? excludeUserId.toString() : null;
-      const isOnlyActor = actorIdStr && targetUserIds.size === 1 && targetUserIds.has(actorIdStr);
-
-      if (targetUserIds.size === 0 || isOnlyActor) {
+      // If target set is empty, broadcast to oversight roles (Admin, Manager, Head of Operations)
+      if (targetUserIds.size === 0) {
         const oversightUsers = await User.find(
           { role: { $in: ['Admin', 'Manager', 'Head of Operations'] }, isActive: { $ne: false } },
           '_id'
@@ -77,10 +74,7 @@ export class NotificationService {
         oversightUsers.forEach((u) => targetUserIds.add(u._id.toString()));
       }
 
-      // Explicitly remove actor (excludeUserId) so the action performer does not get self-popups
-      if (actorIdStr) {
-        targetUserIds.delete(actorIdStr);
-      }
+      // Self Notifications Enabled: Action performer is retained so they also receive self notification popups & alerts
 
       const finalUserIds = Array.from(targetUserIds);
       if (finalUserIds.length === 0) {
