@@ -462,6 +462,22 @@ export const assignProjectStaff = async (req: AuthRequest, res: Response): Promi
           });
         }
 
+        const targetProjectForReplaced = await Project.findById(projectId);
+        const replacedProjectName = targetProjectForReplaced ? targetProjectForReplaced.name : 'Project';
+        await sendNotificationToUser({
+          recipientIds: [assignedUser._id],
+          roles: [],
+          title: '🚫 Removed from Project',
+          message: `You have been removed from project '${replacedProjectName}' (${role}).`,
+          category: 'Project',
+          data: {
+            type: 'project_removed',
+            projectId: projectId.toString(),
+            projectName: replacedProjectName,
+            role: role,
+          },
+        });
+
         await AuditLog.create({
           performedBy: req.user!._id,
           action: 'REMOVE_ROLE',
@@ -494,11 +510,10 @@ export const assignProjectStaff = async (req: AuthRequest, res: Response): Promi
     const targetProject = await Project.findById(projectId);
     const projectName = targetProject ? targetProject.name : 'Project';
 
-    // AUTOMATIC NOTIFICATION: New Project Assigned
+    // AUTOMATIC NOTIFICATION: Send strictly to assigned user
     await sendNotificationToUser({
       recipientIds: [userId],
-      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-      excludeUserId: req.user?._id,
+      roles: [],
       title: '🏗️ Project Assigned',
       message: `You have been assigned to project '${projectName}' as '${role}'. 🏗️`,
       category: 'Project',
@@ -550,6 +565,24 @@ export const removeProjectStaff = async (req: AuthRequest, res: Response): Promi
         $pull: { assignedUsers: userId }
       });
     }
+
+    const targetProject = await Project.findById(projectId);
+    const projectName = targetProject ? targetProject.name : 'Project';
+
+    // AUTOMATIC NOTIFICATION: Send strictly to removed user
+    await sendNotificationToUser({
+      recipientIds: [userId],
+      roles: [],
+      title: '🚫 Removed from Project',
+      message: `You have been removed from project '${projectName}' (${role}).`,
+      category: 'Project',
+      data: {
+        type: 'project_removed',
+        projectId: projectId.toString(),
+        projectName: projectName,
+        role: role,
+      },
+    });
 
     await AuditLog.create({
       performedBy: req.user!._id,

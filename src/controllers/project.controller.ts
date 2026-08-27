@@ -149,11 +149,10 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
       }
 
       if (assignedUsers.length > 0) {
-        // AUTOMATIC NOTIFICATION: New Project Assigned
+        // AUTOMATIC NOTIFICATION: New Project Assigned (Strictly to assigned users)
         await sendNotificationToUser({
           recipientIds: assignedUsers,
-          roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-          excludeUserId: req.user?._id,
+          roles: [],
           title: '🏗️ Project Assigned',
           message: `You have been assigned to project '${project.name}'. 🏗️`,
           category: 'Project',
@@ -199,11 +198,18 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
 
     const oldUserIds = (project.assignedUsers || []).map((u: any) => u.toString());
     const newlyAssignedIds: string[] = [];
+    const removedUserIds: string[] = [];
 
     if (assignedUsers && Array.isArray(assignedUsers)) {
+      const newUserIdsStr = assignedUsers.map((uId: any) => uId.toString());
       assignedUsers.forEach((uId: any) => {
         if (!oldUserIds.includes(uId.toString())) {
           newlyAssignedIds.push(uId.toString());
+        }
+      });
+      oldUserIds.forEach((oldId: string) => {
+        if (!newUserIdsStr.includes(oldId)) {
+          removedUserIds.push(oldId);
         }
       });
 
@@ -242,6 +248,7 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       }
     } else if (assignedUsers === null || (Array.isArray(assignedUsers) && assignedUsers.length === 0)) {
       await ProjectMember.deleteMany({ projectId: id });
+      removedUserIds.push(...oldUserIds);
       project.assignedUsers = [];
     }
 
@@ -261,16 +268,31 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     await project.save();
 
     if (newlyAssignedIds.length > 0) {
-      // AUTOMATIC NOTIFICATION: New Project Assigned
+      // AUTOMATIC NOTIFICATION: Strictly to newly assigned users
       await sendNotificationToUser({
         recipientIds: newlyAssignedIds,
-        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-        excludeUserId: req.user?._id,
+        roles: [],
         title: '🏗️ Project Assigned',
         message: `You have been assigned to project '${project.name}'. 🏗️`,
         category: 'Project',
         data: {
           type: 'project_assigned',
+          projectId: project._id.toString(),
+          projectName: project.name,
+        },
+      });
+    }
+
+    if (removedUserIds.length > 0) {
+      // AUTOMATIC NOTIFICATION: Strictly to removed users
+      await sendNotificationToUser({
+        recipientIds: removedUserIds,
+        roles: [],
+        title: '🚫 Removed from Project',
+        message: `You have been removed from project '${project.name}'.`,
+        category: 'Project',
+        data: {
+          type: 'project_removed',
           projectId: project._id.toString(),
           projectName: project.name,
         },
