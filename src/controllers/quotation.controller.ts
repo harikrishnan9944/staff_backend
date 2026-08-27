@@ -115,20 +115,37 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
     }
 
     const isRFQ = vendor === 'Awaiting Quotation' || Number(amount) === 0;
+    const requestedStatus = req.body.status;
+    const targetQuoteStatus = requestedStatus === 'Approved' ? 'Approved' : 'Pending';
 
     const quotation = await Quotation.create({
       materialId,
       vendor,
       amount,
       description,
-      status: isRFQ ? 'Pending' : 'Approved',
+      status: targetQuoteStatus,
       quotationImage: quotationImage || '',
       transportCharges: transportCharges !== undefined ? Number(transportCharges) : 0,
     });
 
     const projectRecipientIds = await NotificationService.getProjectInvolvedUserIds(material.projectId);
 
-    if (isRFQ) {
+    if (targetQuoteStatus === 'Approved') {
+      // Transition Material status to 'Quotation Approved' directly
+      await Material.findByIdAndUpdate(materialId, { 
+        status: 'Quotation Approved',
+        estimatedCost: amount,
+        vendorName: vendor,
+        transportCharges: transportCharges !== undefined ? Number(transportCharges) : 0
+      });
+
+      // Sync workflow stage to Purchase phase (Progress 60)
+      await MaterialWorkflow.findOneAndUpdate(
+        { materialId },
+        { status: 'Waiting for Purchase', currentStage: 'Purchase', progress: 60 },
+        { upsert: true }
+      );
+    } else if (isRFQ) {
       // Transition Material status to 'Quotation Set'
       await Material.findByIdAndUpdate(materialId, { status: 'Quotation Set' });
       
@@ -146,18 +163,18 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         },
       });
     } else {
-      // Transition Material status to 'Quotation Approved' directly
+      // Transition Material status to 'Awaiting Approval' for quote approval
       await Material.findByIdAndUpdate(materialId, { 
-        status: 'Quotation Approved',
+        status: 'Awaiting Approval',
         estimatedCost: amount,
         vendorName: vendor,
         transportCharges: transportCharges !== undefined ? Number(transportCharges) : 0
       });
 
-      // Sync workflow stage to Purchase phase (Progress 60)
+      // Sync workflow stage to Quotation Approval phase (Progress 55)
       await MaterialWorkflow.findOneAndUpdate(
         { materialId },
-        { status: 'Waiting for Purchase', currentStage: 'Purchase', progress: 60 },
+        { status: 'Awaiting Approval', currentStage: 'Quotation', progress: 55 },
         { upsert: true }
       );
 
@@ -165,11 +182,11 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         excludeUserId: req.user?._id,
-        title: '📄 New Quotation Uploaded',
-        message: `Quotation of ₹${Number(amount).toLocaleString()} from '${vendor}' uploaded for '${material.materialName}'. 📜`,
+        title: '⏳ Quotation Submitted for Approval',
+        message: `Quotation of ₹${Number(amount).toLocaleString()} from '${vendor}' submitted for '${material.materialName}' — Awaiting approval. ⏳`,
         category: 'Quotation',
         data: {
-          type: 'quotation_created',
+          type: 'material_ready_for_approval',
           quotationId: quotation._id.toString(),
           materialId: materialId.toString(),
           materialName: material.materialName,
@@ -239,32 +256,29 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     if (quotationImage !== undefined) quotation.quotationImage = quotationImage;
     if (transportCharges !== undefined) quotation.transportCharges = Number(transportCharges);
 
-    // If quotation is updated with a real vendor and amount, auto-approve it
-    const isNewRealQuote = vendor !== undefined && amount !== undefined && vendor !== 'Awaiting Quotation' && Number(amount) > 0;
-    if (isNewRealQuote && status === undefined) {
-      quotation.status = 'Approved';
-      
-      // Automatically reject all other quotes for the same material
-      await Quotation.updateMany(
-        { materialId: quotation.materialId, _id: { $ne: quotation._id } },
-        { status: 'Rejected' }
-      );
+    // If quotation is updated with amount or vendor without explicit status, set status to Pending and material to Awaiting Approval
+    const hasRateDetails = (amount !== undefined || vendor !== undefined) && status === undefined;
+    if (hasRateDetails) {
+      quotation.status = 'Pending';
 
-      // Transition Material status to 'Quotation Approved'
+      const updateVendor = vendor !== undefined ? vendor : (quotation.vendor || 'Selected Supplier');
+      const updateCost = amount !== undefined ? Number(amount) : (quotation.amount || 0);
+
+      // Transition Material status to 'Awaiting Approval'
       await Material.findByIdAndUpdate(quotation.materialId, {
-        status: 'Quotation Approved',
-        estimatedCost: Number(amount),
-        vendorName: vendor,
+        status: 'Awaiting Approval',
+        estimatedCost: updateCost,
+        vendorName: updateVendor,
         transportCharges: transportCharges !== undefined ? Number(transportCharges) : (quotation.transportCharges || 0),
         lastUpdatedBy: req.user?._id,
         lastUpdatedByRole: req.user?.role,
         lastUpdatedDate: new Date(),
       });
 
-      // Sync workflow stage to Purchase phase (Progress 60)
+      // Sync workflow stage to Quotation Approval phase (Progress 55)
       await MaterialWorkflow.findOneAndUpdate(
         { materialId: quotation.materialId },
-        { status: 'Waiting for Purchase', currentStage: 'Purchase', progress: 60 },
+        { status: 'Awaiting Approval', currentStage: 'Quotation', progress: 55 },
         { upsert: true }
       );
     }
@@ -388,7 +402,7 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
           projectName: projName,
         },
       });
-    } else if (status === 'Approved' || isNewRealQuote) {
+    } else if (status === 'Approved') {
       // Notification 4: Quotation Approved
       await sendNotificationToUser({
         recipientIds: projectRecipientIds,
