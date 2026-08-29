@@ -130,13 +130,86 @@ export class NotificationService {
       if (pushTokens.length > 0) {
         await this.sendExpoPushNotifications(pushTokens, title, message, data);
       } else {
-        console.log('[NotificationService] No push tokens found for recipients. Database notifications saved.');
+        console.log('[NotificationService] No Expo push tokens found for recipients.');
       }
+
+      // 5. Send Web Push Notifications to browser subscriptions
+      await this.sendWebPushNotifications(finalUserIds, title, message, data);
     } catch (error) {
       // FAILURE ISOLATION: Log error and do NOT throw, ensuring business operation stays successful!
       console.error('[NotificationService] Failed to send push notification (isolated):', error);
     }
   }
+
+  /**
+   * Internal helper to dispatch Web Push Notifications via web-push / VAPID.
+   */
+  private static async sendWebPushNotifications(
+    userIds: string[],
+    title: string,
+    body: string,
+    data: Record<string, any>
+  ): Promise<void> {
+    try {
+      const publicKey = process.env.VAPID_PUBLIC_KEY;
+      const privateKey = process.env.VAPID_PRIVATE_KEY;
+      const subject = process.env.VAPID_SUBJECT || 'mailto:admin@staffmanagement.com';
+
+      if (!publicKey || !privateKey) {
+        console.warn('[NotificationService] VAPID keys not configured in environment. Skipping Web Push.');
+        return;
+      }
+
+      const { PushSubscription } = await import('../models/pushSubscription.model');
+      const webpush = (await import('web-push')).default;
+
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+
+      const subscriptions = await PushSubscription.find({ userId: { $in: userIds } });
+      if (!subscriptions || subscriptions.length === 0) {
+        console.log('[NotificationService] No Web Push subscriptions found for recipient users.');
+        return;
+      }
+
+      console.log(`[WebPush] Dispatching to ${subscriptions.length} web push subscription(s)...`);
+
+      const payload = JSON.stringify({
+        title,
+        body,
+        icon: data?.icon || '/globe.svg',
+        url: data?.url || '/',
+        data: data || {},
+        timestamp: Date.now(),
+      });
+
+      const sendPromises = subscriptions.map(async (sub) => {
+        const pushSub = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.keys.p256dh,
+            auth: sub.keys.auth,
+          },
+        };
+
+        try {
+          await webpush.sendNotification(pushSub, payload);
+          console.log(`[WebPush] Successfully sent to subscription endpoint: ${sub.endpoint.slice(0, 30)}...`);
+        } catch (err: any) {
+          console.error(`[WebPush] Delivery error for endpoint ${sub.endpoint.slice(0, 30)}...:`, err.statusCode || err.message);
+          // If subscription is expired or invalid (404 or 410), prune it from database
+          if (err.statusCode === 404 || err.statusCode === 410) {
+            console.log(`[WebPush] Pruning expired subscription endpoint: ${sub.endpoint.slice(0, 30)}...`);
+            await PushSubscription.deleteOne({ _id: sub._id });
+          }
+        }
+      });
+
+      await Promise.allSettled(sendPromises);
+    } catch (err) {
+      console.error('[NotificationService] Error sending Web Push notifications (isolated):', err);
+    }
+  }
+
 
   /**
    * Helper to fetch user IDs involved in a project:

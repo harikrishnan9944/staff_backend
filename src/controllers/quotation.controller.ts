@@ -129,6 +129,29 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
     });
 
     const projectRecipientIds = await NotificationService.getProjectInvolvedUserIds(material.projectId);
+    const targetProject = await Project.findById(material.projectId).select('name').lean();
+    const projectName = targetProject?.name || 'Project';
+    const formattedAmount = `₹${Number(amount).toLocaleString('en-IN')}`;
+
+    // AUTOMATIC NOTIFICATION: Quotation Set / Created
+    await sendNotificationToUser({
+      recipientIds: projectRecipientIds,
+      roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Supervisor', 'Purchase Supervisor', 'Architect'],
+      excludeUserId: req.user?._id,
+      title: `📋 Quotation Set - ${projectName}`,
+      message: `Quotation set for material '${material.materialName}' in project '${projectName}'. Vendor: ${vendor}, Amount: ${formattedAmount} 📄`,
+      category: 'Quotation',
+      data: {
+        type: 'quotation_set',
+        quotationId: quotation._id.toString(),
+        materialId: materialId.toString(),
+        materialName: material.materialName,
+        projectName,
+        amount: Number(amount),
+        vendor,
+        url: '/quotations',
+      },
+    });
 
     if (targetQuoteStatus === 'Approved') {
       // Transition Material status to 'Quotation Approved' directly
@@ -148,20 +171,6 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
     } else if (isRFQ) {
       // Transition Material status to 'Quotation Set'
       await Material.findByIdAndUpdate(materialId, { status: 'Quotation Set' });
-      
-      await sendNotificationToUser({
-        recipientIds: projectRecipientIds,
-        roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
-        excludeUserId: req.user?._id,
-        title: '📄 New Quotation Requested',
-        message: `Quotation request created for material '${material.materialName}' — Ready for supplier rates. 📋`,
-        category: 'Quotation',
-        data: {
-          type: 'quotation_requested',
-          materialId: materialId.toString(),
-          materialName: material.materialName,
-        },
-      });
     } else {
       // Transition Material status to 'Awaiting Approval' for quote approval
       await Material.findByIdAndUpdate(materialId, { 
@@ -182,14 +191,18 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         excludeUserId: req.user?._id,
-        title: '⏳ Quotation Submitted for Approval',
-        message: `Quotation of ₹${Number(amount).toLocaleString()} from '${vendor}' submitted for '${material.materialName}' — Awaiting approval. ⏳`,
+        title: `⏳ Quotation Submitted for Approval - ${projectName}`,
+        message: `Quotation of ${formattedAmount} from '${vendor}' submitted for '${material.materialName}' in project '${projectName}' — Awaiting approval. ⏳`,
         category: 'Quotation',
         data: {
           type: 'material_ready_for_approval',
           quotationId: quotation._id.toString(),
           materialId: materialId.toString(),
           materialName: material.materialName,
+          projectName,
+          amount: Number(amount),
+          vendor,
+          url: '/quotations',
         },
       });
     }
@@ -201,13 +214,18 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         excludeUserId: req.user?._id,
-        title: '🎉 Quotation Approved Successfully',
-        message: `Quotation for material '${material.materialName}' has been approved and is ready for purchase! ✅`,
+        title: `🎉 Quotation Approved - ${projectName}`,
+        message: `Quotation of ${formattedAmount} for material '${material.materialName}' in project '${projectName}' has been approved and is ready for purchase! ✅`,
         category: 'Quotation',
         data: {
           type: 'quotation_approved',
           quotationId: quotation._id.toString(),
           materialId: materialId.toString(),
+          materialName: material.materialName,
+          projectName,
+          amount: Number(amount),
+          vendor,
+          url: '/quotations',
         },
       });
 
@@ -216,13 +234,16 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
         excludeUserId: req.user?._id,
-        title: '🛍️ Ready for Purchase',
-        message: `Material '${material.materialName}' is approved — Ready for purchase. 🚚`,
+        title: `🛍️ Ready for Purchase - ${projectName}`,
+        message: `Material '${material.materialName}' (${formattedAmount}) in project '${projectName}' is approved — Ready for purchase. 🚚`,
         category: 'Purchase',
         data: {
           type: 'material_sent_to_purchase',
           materialId: materialId.toString(),
           materialName: material.materialName,
+          projectName,
+          amount: Number(amount),
+          url: '/purchases',
         },
       });
     }
@@ -233,6 +254,7 @@ export const createQuotation = async (req: AuthRequest, res: Response): Promise<
       quotation,
     });
   } catch (error) {
+
     console.error('createQuotation error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
@@ -379,6 +401,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
     const matName = materialDoc?.materialName || 'Material';
     const projDoc = materialDoc?.projectId ? await Project.findById(materialDoc.projectId).select('name').lean() : null;
     const projName = projDoc?.name || 'Project';
+    const fmtAmount = `₹${Number(quotation.amount || 0).toLocaleString('en-IN')}`;
+    const quoteVendor = quotation.vendor || 'Supplier';
 
     const projectRecipientIds = materialDoc?.projectId 
       ? await NotificationService.getProjectInvolvedUserIds(materialDoc.projectId)
@@ -391,8 +415,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Manager', 'Head of Operations'],
         excludeUserId: req.user?._id,
-        title: '⏳ Ready for Approval',
-        message: `Quotation for material '${matName}' in project '${projName}' is ready for your approval. ✅`,
+        title: `⏳ Ready for Approval - ${projName}`,
+        message: `Quotation of ${fmtAmount} from '${quoteVendor}' for material '${matName}' in project '${projName}' is ready for approval. ✅`,
         category: 'Quotation',
         data: {
           type: 'material_ready_for_approval',
@@ -400,6 +424,9 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
           materialId: quotation.materialId.toString(),
           materialName: matName,
           projectName: projName,
+          amount: quotation.amount,
+          vendor: quoteVendor,
+          url: '/quotations',
         },
       });
     } else if (status === 'Approved') {
@@ -408,8 +435,8 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff'],
         excludeUserId: req.user?._id,
-        title: '🎉 Quotation Approved Successfully',
-        message: `Quotation for material '${matName}' in project '${projName}' has been approved successfully. ✅`,
+        title: `🎉 Quotation Approved - ${projName}`,
+        message: `Quotation of ${fmtAmount} for material '${matName}' in project '${projName}' has been approved successfully. ✅`,
         category: 'Quotation',
         data: {
           type: 'quotation_approved',
@@ -417,6 +444,9 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
           materialId: quotation.materialId.toString(),
           materialName: matName,
           projectName: projName,
+          amount: quotation.amount,
+          vendor: quoteVendor,
+          url: '/quotations',
         },
       });
 
@@ -425,17 +455,20 @@ export const updateQuotation = async (req: AuthRequest, res: Response): Promise<
         recipientIds: projectRecipientIds,
         roles: ['Admin', 'Head of Operations', 'Manager', 'Staff', 'Purchase Supervisor', 'Supervisor'],
         excludeUserId: req.user?._id,
-        title: '🛍️ Ready for Purchase',
-        message: `Quotation approved for material '${matName}' in project '${projName}' — Ready for purchase. 🚚`,
+        title: `🛍️ Ready for Purchase - ${projName}`,
+        message: `Quotation approved for material '${matName}' (${fmtAmount}) in project '${projName}' — Ready for purchase. 🚚`,
         category: 'Purchase',
         data: {
           type: 'material_sent_to_purchase',
           materialId: quotation.materialId.toString(),
           materialName: matName,
           projectName: projName,
+          amount: quotation.amount,
+          url: '/purchases',
         },
       });
     }
+
 
     res.status(200).json({
       success: true,
