@@ -9,7 +9,7 @@ import { Notification } from '../models/notification.model';
 const getProjectQueryByRole = async (userId: string, role: string) => {
   const isAdminOrOperations = ['Admin', 'Head of Operations', 'Manager'].includes(role);
   if (isAdminOrOperations) return {};
-  const memberships = await ProjectMember.find({ userId });
+  const memberships = await ProjectMember.find({ userId }).select('projectId').lean();
   const projectIds = memberships.map(m => m.projectId);
   return { _id: { $in: projectIds } };
 };
@@ -27,16 +27,28 @@ export const getDashboardSummary = async (req: AuthRequest, res: Response): Prom
     const userId = user._id.toString();
     const role = user.role;
 
-    // 1. Projects statistics
     const projectQuery = await getProjectQueryByRole(userId, role);
-    const totalProjects = await Project.countDocuments(projectQuery);
-    const activeProjects = await Project.countDocuments({ ...projectQuery, status: 'Active' });
-    const completedProjects = await Project.countDocuments({ ...projectQuery, status: 'Completed' });
 
-    // 2. Pending purchases statistic (replacing tasks count)
-    const pendingPurchases = await Purchase.countDocuments({ status: 'Approved', paymentStatus: 'Pending' });
+    // Parallelize all metrics and project list queries
+    const [
+      totalProjects,
+      activeProjects,
+      completedProjects,
+      pendingPurchases,
+      recentProjects
+    ] = await Promise.all([
+      Project.countDocuments(projectQuery),
+      Project.countDocuments({ ...projectQuery, status: 'Active' }),
+      Project.countDocuments({ ...projectQuery, status: 'Completed' }),
+      Purchase.countDocuments({ status: 'Approved', paymentStatus: 'Pending' }),
+      Project.find(projectQuery)
+        .populate('assignedUsers', 'name username profileImage role')
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .lean()
+    ]);
 
-    // 3. Workflow metrics
+    // Workflow metrics
     const workflowMetrics = {
       pendingMaterials: 6,
       pendingQuotations: 4,
@@ -45,13 +57,7 @@ export const getDashboardSummary = async (req: AuthRequest, res: Response): Prom
       completedPurchases: 14,
     };
 
-    // 4. Fetch recent projects
-    const recentProjects = await Project.find(projectQuery)
-      .populate('assignedUsers', 'name username profileImage role')
-      .sort({ updatedAt: -1 })
-      .limit(5);
-
-    // 5. Static mock recent activities (removes Activity database dependency)
+    // Static mock recent activities (removes Activity database dependency)
     const recentActivities = [
       { 
         _id: 'act1', 
@@ -99,10 +105,12 @@ export const getAnalyticsData = async (req: AuthRequest, res: Response): Promise
 
     const projectQuery = await getProjectQueryByRole(user._id.toString(), user.role);
 
-    // Projects by status distribution
-    const active = await Project.countDocuments({ ...projectQuery, status: 'Active' });
-    const completed = await Project.countDocuments({ ...projectQuery, status: 'Completed' });
-    const suspended = await Project.countDocuments({ ...projectQuery, status: 'Suspended' });
+    // Parallel count distribution
+    const [active, completed, suspended] = await Promise.all([
+      Project.countDocuments({ ...projectQuery, status: 'Active' }),
+      Project.countDocuments({ ...projectQuery, status: 'Completed' }),
+      Project.countDocuments({ ...projectQuery, status: 'Suspended' }),
+    ]);
 
     const projectsByStatus = [
       { label: 'Active', value: active || 5, color: '#0f172a' },
@@ -160,11 +168,13 @@ export const getNotifications = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const notifications = await Notification.find({ userId: user._id })
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    const unreadCount = await Notification.countDocuments({ userId: user._id, read: false });
+    const [notifications, unreadCount] = await Promise.all([
+      Notification.find({ userId: user._id })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean(),
+      Notification.countDocuments({ userId: user._id, read: false })
+    ]);
 
     res.status(200).json({
       success: true,

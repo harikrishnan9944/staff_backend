@@ -44,39 +44,59 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
       query._id = { $in: uniqueProjectIds.map(id => new mongoose.Types.ObjectId(id)) };
     }
 
-    const projects = await Project.find(query).sort({ createdAt: -1 });
+    const projects = await Project.find(query).sort({ createdAt: -1 }).lean();
+    const projectIds = projects.map(p => p._id);
 
-    const projectsWithMembers = await Promise.all(
-      projects.map(async (project) => {
-        const members = await ProjectMember.find({ projectId: project._id })
-          .populate('userId', 'name username role email phone profileImage employeeId department isActive');
-        
-        const memberUsers = members.map(m => {
-          if (m.userId) {
-            const uObj = (m.userId as any).toObject ? (m.userId as any).toObject() : m.userId;
-            return { ...uObj, role: m.role || uObj.role };
-          }
-          return null;
-        }).filter(Boolean);
+    // Batch fetch all project members and direct assigned users in 2 queries instead of 2N queries
+    const [allMembers, allDirectUsers] = await Promise.all([
+      ProjectMember.find({ projectId: { $in: projectIds } })
+        .populate('userId', 'name username role email phone profileImage employeeId department isActive')
+        .lean(),
+      User.find(
+        { _id: { $in: Array.from(new Set(projects.flatMap(p => (p.assignedUsers || []).map(id => String(id))))) } },
+        'name username role email phone profileImage employeeId department isActive'
+      ).lean(),
+    ]);
 
-        const directUsers = await User.find({ _id: { $in: project.assignedUsers || [] } }, 'name username role email phone profileImage employeeId department isActive').lean();
-
-        const userMap = new Map();
-        [...directUsers, ...memberUsers].forEach((u: any) => {
-          if (u && (u._id || u.id)) {
-            userMap.set(String(u._id || u.id), u);
-          }
+    const membersByProject = new Map<string, any[]>();
+    allMembers.forEach((m: any) => {
+      const pId = String(m.projectId);
+      if (!membersByProject.has(pId)) membersByProject.set(pId, []);
+      if (m.userId) {
+        membersByProject.get(pId)!.push({
+          ...m.userId,
+          role: m.role || m.userId.role,
         });
+      }
+    });
 
-        const mergedAssignedUsers = Array.from(userMap.values());
+    const usersById = new Map<string, any>();
+    allDirectUsers.forEach((u: any) => {
+      usersById.set(String(u._id), u);
+    });
 
-        return {
-          ...project.toObject(),
-          assignedUsers: mergedAssignedUsers,
-          assignedStaff: mergedAssignedUsers,
-        };
-      })
-    );
+    const projectsWithMembers = projects.map((project: any) => {
+      const pIdStr = String(project._id);
+      const memberUsers = membersByProject.get(pIdStr) || [];
+      const directUsers = (project.assignedUsers || [])
+        .map((uid: any) => usersById.get(String(uid)))
+        .filter(Boolean);
+
+      const userMap = new Map();
+      [...directUsers, ...memberUsers].forEach((u: any) => {
+        if (u && (u._id || u.id)) {
+          userMap.set(String(u._id || u.id), u);
+        }
+      });
+
+      const mergedAssignedUsers = Array.from(userMap.values());
+
+      return {
+        ...project,
+        assignedUsers: mergedAssignedUsers,
+        assignedStaff: mergedAssignedUsers,
+      };
+    });
 
     res.status(200).json({
       success: true,

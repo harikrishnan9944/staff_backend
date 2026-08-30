@@ -52,7 +52,8 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
     const users = await User.find(query)
       .select('-password')
       .populate('createdBy', 'name username')
-      .sort(sortOption);
+      .sort(sortOption)
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -79,7 +80,8 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 
     const user = await User.findById(id)
       .select('-password')
-      .populate('createdBy', 'name username');
+      .populate('createdBy', 'name username')
+      .lean();
 
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
@@ -116,27 +118,26 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
     } = req.body;
     const adminUser = req.user;
 
-    // Check unique username
-    const usernameExists = await User.findOne({ username });
+    // Parallel check for unique username, email, and employee ID
+    const [usernameExists, emailExists, empExists] = await Promise.all([
+      User.findOne({ username }).select('_id').lean(),
+      User.findOne({ email }).select('_id').lean(),
+      employeeId ? User.findOne({ employeeId }).select('_id').lean() : Promise.resolve(null),
+    ]);
+
     if (usernameExists) {
       res.status(400).json({ success: false, message: 'Username is already taken' });
       return;
     }
 
-    // Check unique email
-    const emailExists = await User.findOne({ email });
     if (emailExists) {
       res.status(400).json({ success: false, message: 'Email is already registered' });
       return;
     }
 
-    // Check unique employee ID if provided
-    if (employeeId) {
-      const empExists = await User.findOne({ employeeId });
-      if (empExists) {
-        res.status(400).json({ success: false, message: 'Employee ID is already registered' });
-        return;
-      }
+    if (empExists) {
+      res.status(400).json({ success: false, message: 'Employee ID is already registered' });
+      return;
     }
 
     const newUser = await User.create({

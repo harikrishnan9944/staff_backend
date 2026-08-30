@@ -142,20 +142,22 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
       const userIdStr = req.user._id.toString();
       const userObjId = new mongoose.Types.ObjectId(userIdStr);
 
-      const memberships = await ProjectMember.find({
-        $or: [
-          { userId: userObjId },
-          { userId: userIdStr }
-        ]
-      });
-      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      const [memberships, directProjects] = await Promise.all([
+        ProjectMember.find({
+          $or: [
+            { userId: userObjId },
+            { userId: userIdStr }
+          ]
+        }).select('projectId').lean(),
+        Project.find({
+          $or: [
+            { assignedUsers: userObjId },
+            { assignedUsers: userIdStr }
+          ]
+        }).select('_id').lean()
+      ]);
 
-      const directProjects = await Project.find({
-        $or: [
-          { assignedUsers: userObjId },
-          { assignedUsers: userIdStr }
-        ]
-      });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
       const directProjectIds = directProjects.map(p => p._id.toString());
 
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
@@ -216,8 +218,6 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
     } else if (sort === 'Z-A') {
       sortOption = { materialName: -1 };
     } else if (sort === 'Priority') {
-      // Custom priority sorting order High -> Medium -> Low can be mapped in aggregation, 
-      // here we do standard sort on priority string or fallback to name
       sortOption = { priority: 1, materialName: 1 };
     } else if (sort === 'Status') {
       sortOption = { status: 1 };
@@ -229,7 +229,8 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
       .populate('createdBy', 'name username')
       .populate('lastUpdatedBy', 'name username')
       .populate('projectId', 'name')
-      .sort(sortOption);
+      .sort(sortOption)
+      .lean();
 
     res.status(200).json({
       success: true,

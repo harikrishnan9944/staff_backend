@@ -33,5 +33,6 @@ const ProjectMemberSchema = new Schema<IProjectMember>(
 
 // Optimize query performance with combined index
 ProjectMemberSchema.index({ projectId: 1, userId: 1, role: 1 }, { unique: true });
+ProjectMemberSchema.index({ userId: 1, projectId: 1 });
 
 export const ProjectMember = model<IProjectMember>('ProjectMember', ProjectMemberSchema);

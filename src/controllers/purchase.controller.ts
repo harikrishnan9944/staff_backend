@@ -42,20 +42,22 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
       const userIdStr = req.user._id.toString();
       const userObjId = new mongoose.Types.ObjectId(userIdStr);
 
-      const memberships = await ProjectMember.find({
-        $or: [
-          { userId: userObjId },
-          { userId: userIdStr }
-        ]
-      });
-      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      const [memberships, directProjects] = await Promise.all([
+        ProjectMember.find({
+          $or: [
+            { userId: userObjId },
+            { userId: userIdStr }
+          ]
+        }).select('projectId').lean(),
+        Project.find({
+          $or: [
+            { assignedUsers: userObjId },
+            { assignedUsers: userIdStr }
+          ]
+        }).select('_id').lean()
+      ]);
 
-      const directProjects = await Project.find({
-        $or: [
-          { assignedUsers: userObjId },
-          { assignedUsers: userIdStr }
-        ]
-      });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
       const directProjectIds = directProjects.map((p: any) => p._id.toString());
 
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
@@ -113,7 +115,8 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
       .populate('materialId', 'materialName brand unit materialImage')
       .populate('vendorId', 'name username')
       .populate('createdBy', 'name username')
-      .sort(sortOption);
+      .sort(sortOption)
+      .lean();
 
     res.status(200).json({
       success: true,

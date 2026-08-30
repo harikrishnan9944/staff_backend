@@ -50,7 +50,8 @@ export const getInvoices = async (req: AuthRequest, res: Response): Promise<void
       .populate('purchaseId', 'purchaseOrderNumber finalAmount')
       .populate('vendorId', 'name username')
       .populate('uploadedBy', 'name username')
-      .sort(sortOption);
+      .sort(sortOption)
+      .lean();
 
     res.status(200).json({
       success: true,

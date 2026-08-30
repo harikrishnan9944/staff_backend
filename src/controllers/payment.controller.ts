@@ -58,7 +58,8 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
       .populate('purchaseId', 'purchaseOrderNumber finalAmount')
       .populate('vendorId', 'name')
       .populate('createdBy', 'name username')
-      .sort(sortOption);
+      .sort(sortOption)
+      .lean();
 
     res.status(200).json({
       success: true,

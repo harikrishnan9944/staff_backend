@@ -104,5 +104,8 @@ ProjectSchema.methods.compareDeletePassword = async function (candidatePassword:
   return bcrypt.compare(candidatePassword, this.deletePassword);
 };
 
+ProjectSchema.index({ status: 1, updatedAt: -1 });
+ProjectSchema.index({ assignedUsers: 1 });
+
 export const Project = model<IProject>('Project', ProjectSchema);
 

@@ -19,20 +19,22 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
       const userIdStr = req.user._id.toString();
       const userObjId = new mongoose.Types.ObjectId(userIdStr);
 
-      const memberships = await ProjectMember.find({
-        $or: [
-          { userId: userObjId },
-          { userId: userIdStr }
-        ]
-      });
-      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      const [memberships, directProjects] = await Promise.all([
+        ProjectMember.find({
+          $or: [
+            { userId: userObjId },
+            { userId: userIdStr }
+          ]
+        }).select('projectId').lean(),
+        Project.find({
+          $or: [
+            { assignedUsers: userObjId },
+            { assignedUsers: userIdStr }
+          ]
+        }).select('_id').lean()
+      ]);
 
-      const directProjects = await Project.find({
-        $or: [
-          { assignedUsers: userObjId },
-          { assignedUsers: userIdStr }
-        ]
-      });
+      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
       const directProjectIds = directProjects.map((p: any) => p._id.toString());
 
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
@@ -59,13 +61,14 @@ export const getQuotations = async (req: AuthRequest, res: Response): Promise<vo
     const quotations = await Quotation.find(query)
       .populate({
         path: 'materialId',
-        select: 'materialName brand unit projectId',
-        populate: {
-          path: 'projectId',
-          select: 'name'
-        }
+        select: 'materialName brand unit estimatedCost categoryId projectId status assignedUser',
+        populate: [
+          { path: 'categoryId', select: 'name color' },
+          { path: 'projectId', select: 'name' }
+        ]
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,

@@ -18,7 +18,12 @@ export const connectDB = async (): Promise<void> => {
       console.log('MongoDB disconnected');
     });
 
-    await mongoose.connect(connStr);
+    await mongoose.connect(connStr, {
+      maxPoolSize: 15,
+      minPoolSize: 2,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error);
     process.exit(1);
