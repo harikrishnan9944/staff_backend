@@ -165,7 +165,10 @@ export class NotificationService {
 
       webpush.setVapidDetails(subject, publicKey, privateKey);
 
-      const subscriptions = await PushSubscription.find({ userId: { $in: userIds } });
+      const objectIds = userIds.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id));
+      const subscriptions = await PushSubscription.find({
+        $or: [{ userId: { $in: objectIds } }, { userId: { $in: userIds } }],
+      });
       if (!subscriptions || subscriptions.length === 0) {
         console.log('[NotificationService] No Web Push subscriptions found for recipient users.');
         return;
