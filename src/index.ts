@@ -88,6 +88,13 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Start Server
-app.listen(Number(PORT), '0.0.0.0', () => {
+const server = app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
+});
+
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[Fatal Server Error] Port ${PORT} is already in use by another process. Exiting cleanly...`);
+    process.exit(1);
+  }
 });

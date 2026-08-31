@@ -56,6 +56,6 @@ const QuotationSchema = new Schema<IQuotation>(
 );
 
 QuotationSchema.index({ materialId: 1, status: 1 });
-QuotationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 40 * 24 * 60 * 60 });
+QuotationSchema.index({ createdAt: -1 });
 
 export const Quotation = model<IQuotation>('Quotation', QuotationSchema);

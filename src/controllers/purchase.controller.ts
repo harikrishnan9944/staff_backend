@@ -57,7 +57,9 @@ export const getPurchases = async (req: AuthRequest, res: Response): Promise<voi
         }).select('_id').lean()
       ]);
 
-      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      const memberProjectIds = memberships
+        .filter((m: any) => m && m.projectId)
+        .map((m: any) => m.projectId.toString());
       const directProjectIds = directProjects.map((p: any) => p._id.toString());
 
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));

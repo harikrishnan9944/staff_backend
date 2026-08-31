@@ -174,10 +174,10 @@ const MaterialSchema = new Schema<IMaterial>(
   }
 );
 
-// Compound index for search performance
+// Compound indexes for high performance search and listing
 MaterialSchema.index({ categoryId: 1, materialName: 1 });
-MaterialSchema.index({ projectId: 1, status: 1 });
+MaterialSchema.index({ projectId: 1, status: 1, createdAt: -1 });
 MaterialSchema.index({ status: 1 });
-MaterialSchema.index({ createdAt: 1 }, { expireAfterSeconds: 40 * 24 * 60 * 60 });
+MaterialSchema.index({ assignedUser: 1 });
 
 export const Material = model<IMaterial>('Material', MaterialSchema);

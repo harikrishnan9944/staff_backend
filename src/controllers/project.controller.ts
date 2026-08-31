@@ -30,7 +30,9 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
           { userId: userIdStr }
         ]
       });
-      const memberProjectIds = memberships.map(m => m.projectId.toString());
+      const memberProjectIds = memberships
+        .filter((m: any) => m && m.projectId)
+        .map((m: any) => m.projectId.toString());
 
       const directProjects = await Project.find({
         $or: [

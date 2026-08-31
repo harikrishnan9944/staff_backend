@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
 import '../models/category.model';
+
+// Prefer IPv4 over IPv6 on Windows to prevent MongoDB Atlas DNS socket timeouts
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 export const connectDB = async (): Promise<void> => {
   try {
@@ -19,10 +25,13 @@ export const connectDB = async (): Promise<void> => {
     });
 
     await mongoose.connect(connStr, {
-      maxPoolSize: 15,
+      maxPoolSize: 20,
       minPoolSize: 2,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      maxIdleTimeMS: 30000,
+      family: 4, // Force IPv4
     });
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error);

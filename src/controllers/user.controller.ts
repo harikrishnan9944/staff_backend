@@ -734,13 +734,14 @@ export const testPushNotification = async (req: AuthRequest, res: Response): Pro
       });
     }
 
-    const tokens = Array.from(tokensSet);
-    console.log(`[TestPush] Testing push notification for user '${dbUser.username}' (${dbUser.name}), tokens found:`, tokens);
+    const isExpoToken = (t: string) => typeof t === 'string' && t.trim().length > 0 && (t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken'));
+    const tokens = Array.from(tokensSet).filter(isExpoToken);
+    console.log(`[TestPush] Testing push notification for user '${dbUser.username}' (${dbUser.name}), valid Expo tokens found:`, tokens);
 
     if (tokens.length === 0) {
-      res.status(400).json({
+      res.status(200).json({
         success: false,
-        message: 'No push tokens found for user in MongoDB',
+        message: 'No valid Expo push tokens found for user in MongoDB',
         user: { id: dbUser._id, username: dbUser.username, name: dbUser.name },
         tokensFound: 0,
       });

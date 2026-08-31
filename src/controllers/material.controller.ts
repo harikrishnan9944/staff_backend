@@ -137,7 +137,7 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
 
     const query: any = {};
 
-    // Filter materials by assigned projects for non-Admin roles
+    // Filter materials by assigned projects or user ownership for non-Admin roles
     if (req.user && req.user.role !== 'Admin') {
       const userIdStr = req.user._id.toString();
       const userObjId = new mongoose.Types.ObjectId(userIdStr);
@@ -157,35 +157,53 @@ export const getMaterials = async (req: AuthRequest, res: Response): Promise<voi
         }).select('_id').lean()
       ]);
 
-      const memberProjectIds = memberships.map((m: any) => m.projectId.toString());
+      const memberProjectIds = memberships
+        .filter((m: any) => m && m.projectId)
+        .map((m: any) => m.projectId.toString());
       const directProjectIds = directProjects.map(p => p._id.toString());
-
       const userAssignedProjectIds = Array.from(new Set([...memberProjectIds, ...directProjectIds]));
-      const userAssignedProjectObjIds = userAssignedProjectIds.map(id => new mongoose.Types.ObjectId(id));
+      const userAssignedProjectObjIds = userAssignedProjectIds
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+      const allAssignedProjIds = [...userAssignedProjectIds, ...userAssignedProjectObjIds];
 
       if (projectId && projectId !== 'undefined' && projectId !== 'null') {
-        if (!userAssignedProjectIds.includes(String(projectId))) {
-          query.projectId = { $in: [] };
-        } else {
-          query.projectId = new mongoose.Types.ObjectId(String(projectId));
-        }
-      } else {
-        query.projectId = { $in: userAssignedProjectObjIds };
+        const projStr = String(projectId);
+        const projObjId = mongoose.Types.ObjectId.isValid(projStr) ? new mongoose.Types.ObjectId(projStr) : null;
+        query.$or = [
+          { projectId: projStr },
+          ...(projObjId ? [{ projectId: projObjId }] : [])
+        ];
+      } else if (allAssignedProjIds.length > 0) {
+        query.$or = [
+          { projectId: { $in: allAssignedProjIds } },
+          { createdBy: userObjId },
+          { createdBy: userIdStr },
+          { assignedUser: userObjId },
+          { assignedUser: userIdStr },
+        ];
       }
     } else if (projectId && projectId !== 'undefined' && projectId !== 'null') {
-      query.projectId = new mongoose.Types.ObjectId(String(projectId));
+      const projStr = String(projectId);
+      const projObjId = mongoose.Types.ObjectId.isValid(projStr) ? new mongoose.Types.ObjectId(projStr) : null;
+      query.$or = [
+        { projectId: projStr },
+        ...(projObjId ? [{ projectId: projObjId }] : [])
+      ];
     }
 
     if (categoryId && categoryId !== 'undefined' && categoryId !== 'null') {
       query.categoryId = categoryId;
     }
 
-    // Search query (Material Name or Brand)
+    // Search query (Material Name, Brand, Description, Remarks)
     if (search) {
       const searchRegex = new RegExp(String(search), 'i');
       query.$or = [
         { materialName: searchRegex },
         { brand: searchRegex },
+        { description: searchRegex },
+        { remarks: searchRegex }
       ];
     }
 
