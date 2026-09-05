@@ -42,6 +42,18 @@ export class NotificationService {
       // 1. Gather all target user IDs
       const targetUserIds = new Set<string>();
 
+      // ALWAYS add ALL active Admin users! Every Admin user MUST receive notifications for ALL events across the system!
+      const adminUsers = await User.find(
+        { role: 'Admin', isActive: { $ne: false } },
+        '_id'
+      ).lean();
+      const adminIdSet = new Set<string>();
+      adminUsers.forEach((u) => {
+        const adminIdStr = u._id.toString();
+        targetUserIds.add(adminIdStr);
+        adminIdSet.add(adminIdStr);
+      });
+
       // Add direct recipient IDs
       recipientIds.forEach((id) => {
         if (id) {
@@ -74,7 +86,13 @@ export class NotificationService {
         oversightUsers.forEach((u) => targetUserIds.add(u._id.toString()));
       }
 
-      // Self Notifications Enabled: Action performer is retained so they also receive self notification popups & alerts
+      // Exclude performer ONLY if they are NOT an Admin (Admin users must ALWAYS receive notifications)
+      if (excludeUserId) {
+        const excludeStr = excludeUserId.toString();
+        if (!adminIdSet.has(excludeStr)) {
+          targetUserIds.delete(excludeStr);
+        }
+      }
 
       const finalUserIds = Array.from(targetUserIds);
       if (finalUserIds.length === 0) {
