@@ -302,7 +302,6 @@ export class NotificationService {
         priority: 'high',
         channelId: 'default',
         badge: 1,
-        _displayInForeground: true,
       }));
 
       // Expo Push API endpoint
@@ -310,7 +309,6 @@ export class NotificationService {
         method: 'POST',
         headers: {
           Accept: 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(messages),
