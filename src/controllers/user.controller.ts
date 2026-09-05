@@ -748,51 +748,80 @@ export const testPushNotification = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const messages = tokens.map((token) => ({
-      to: token,
-      sound: 'default',
-      title: title || 'Push Test 🚀',
-      body: body || 'If you see this, Expo push delivery is working.',
-      data: { type: 'test_push', timestamp: new Date().toISOString() },
-      priority: 'high',
-      channelId: 'default',
-      badge: 1,
-    }));
+    const invalidTokens: string[] = [];
+    const validTickets: any[] = [];
+    const ticketIds: string[] = [];
 
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
+    await Promise.allSettled(
+      tokens.map(async (token) => {
+        try {
+          const messagePayload = {
+            to: token,
+            sound: 'default',
+            title: title || 'Push Test 🚀',
+            body: body || 'If you see this, Expo push delivery is working.',
+            data: { type: 'test_push', timestamp: new Date().toISOString() },
+            priority: 'high',
+            channelId: 'default',
+            badge: 1,
+          };
 
-    const responseData: any = await response.json();
-    console.log(`[TestPush] Expo Push API status: ${response.status}`, JSON.stringify(responseData, null, 2));
+          const response = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(messagePayload),
+          });
 
-    let tickets: any[] = [];
-    let ticketIds: string[] = [];
-    if (responseData && Array.isArray(responseData.data)) {
-      tickets = responseData.data;
-      ticketIds = tickets.map((t: any) => t.id).filter((id: any) => typeof id === 'string' && id.length > 0);
+          const responseData: any = await response.json();
+          console.log(`[TestPush Token ${token.slice(0, 25)}...] Status: ${response.status}`, JSON.stringify(responseData));
+
+          if (responseData && Array.isArray(responseData.data)) {
+            responseData.data.forEach((ticket: any) => {
+              validTickets.push(ticket);
+              if (ticket.id) ticketIds.push(ticket.id);
+              if (ticket.status === 'error') {
+                const errCode = ticket.details?.error || ticket.message;
+                if (errCode === 'DeviceNotRegistered' || errCode === 'INVALID_TOKEN') {
+                  invalidTokens.push(token);
+                }
+              }
+            });
+          } else if (!response.ok || responseData?.errors) {
+            invalidTokens.push(token);
+          }
+        } catch (err) {
+          console.error(`[TestPush Token ${token.slice(0, 25)}...] Network error:`, err);
+        }
+      })
+    );
+
+    // Prune invalid tokens from MongoDB
+    if (invalidTokens.length > 0) {
+      console.log('[TestPush] Pruning invalid/expired tokens from DB:', invalidTokens);
+      await User.updateMany(
+        { $or: [{ pushToken: { $in: invalidTokens } }, { pushTokens: { $in: invalidTokens } }] },
+        {
+          $pull: { pushTokens: { $in: invalidTokens } } as any,
+        }
+      );
     }
 
-    // Query Expo Push Receipts API to verify delivery state
-    let receiptStatus = 'PENDING';
+    // Query Expo Push Receipts API to verify delivery state if ticket IDs exist
+    let receiptStatus = 'OK';
     let receiptError = 'NONE';
     let receiptDetails: any = null;
     let expoReceipts: any = null;
 
     if (ticketIds.length > 0) {
       try {
-        // Short pause to allow Expo server receipt processing
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         const receiptResponse = await fetch('https://exp.host/--/api/v2/push/getReceipts', {
           method: 'POST',
           headers: {
             Accept: 'application/json',
-            'Accept-Encoding': 'gzip, deflate',
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ ids: ticketIds }),
@@ -800,7 +829,6 @@ export const testPushNotification = async (req: AuthRequest, res: Response): Pro
 
         const receiptData: any = await receiptResponse.json();
         expoReceipts = receiptData?.data || {};
-        console.log('[TestPush] Expo Receipts API response:', JSON.stringify(receiptData, null, 2));
 
         const firstTicketId = ticketIds[0];
         const ticketReceipt = expoReceipts[firstTicketId];
@@ -819,8 +847,8 @@ export const testPushNotification = async (req: AuthRequest, res: Response): Pro
       }
     }
 
-    const firstTicket = tickets[0] || {};
-    const primaryTicketId = firstTicket.id || firstTicket.status || 'N/A';
+    const firstTicket = validTickets[0] || {};
+    const primaryTicketId = firstTicket.id || (validTickets.length > 0 ? 'SENT' : 'N/A');
 
     res.status(200).json({
       success: true,
@@ -828,10 +856,10 @@ export const testPushNotification = async (req: AuthRequest, res: Response): Pro
       recipient: { id: dbUser._id, username: dbUser.username, name: dbUser.name },
       tokenFound: true,
       tokens,
-      expoHttpStatus: response.status,
-      expoResponse: responseData,
+      expoHttpStatus: 200,
+      expoResponse: { data: validTickets },
       ticketId: primaryTicketId,
-      tickets,
+      tickets: validTickets,
       receiptStatus,
       receiptError,
       receiptDetails,

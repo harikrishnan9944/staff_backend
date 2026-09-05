@@ -281,7 +281,6 @@ export class NotificationService {
     data: Record<string, any>
   ): Promise<void> {
     try {
-      // Validate push tokens format
       const validTokens = tokens.filter(
         (t) => typeof t === 'string' && t.trim().length > 0 && (t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken') || t.includes('['))
       );
@@ -292,56 +291,57 @@ export class NotificationService {
       }
 
       console.log(`EXPO PUSH REQUEST STARTED for ${validTokens.length} token(s)`);
+      const invalidTokens: string[] = [];
 
-      const messages = validTokens.map((token) => ({
-        to: token,
-        sound: 'default',
-        title,
-        body,
-        data,
-        priority: 'high',
-        channelId: 'default',
-        badge: 1,
-      }));
+      await Promise.allSettled(
+        validTokens.map(async (token) => {
+          try {
+            const messagePayload = {
+              to: token,
+              sound: 'default',
+              title,
+              body,
+              data,
+              priority: 'high',
+              channelId: 'default',
+              badge: 1,
+            };
 
-      // Expo Push API endpoint
-      const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messages),
-      });
+            const response = await fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(messagePayload),
+            });
 
-      const responseData: any = await response.json();
-      console.log(`EXPO RESPONSE: Status ${response.status}`, JSON.stringify(responseData));
+            const responseData: any = await response.json();
+            console.log(`[PushToken ${token.slice(0, 25)}...] Status: ${response.status}`, JSON.stringify(responseData));
 
-      // Parse tickets and safely prune unregistered tokens from DB
-      if (responseData && Array.isArray(responseData.data)) {
-        const ticketIds = responseData.data.map((t: any) => t.id || t.status).filter(Boolean);
-        console.log(`EXPO TICKET IDS: [${ticketIds.join(', ')}]`);
-
-        const invalidTokens: string[] = [];
-        responseData.data.forEach((ticket: any, index: number) => {
-          if (ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered') {
-            const badToken = validTokens[index];
-            if (badToken) invalidTokens.push(badToken);
-          }
-        });
-
-        if (invalidTokens.length > 0) {
-          console.log('[NotificationService] Pruning invalid/unregistered Expo push tokens from DB:', invalidTokens);
-          await User.updateMany(
-            { $or: [{ pushToken: { $in: invalidTokens } }, { pushTokens: { $in: invalidTokens } }] },
-            {
-              $pull: { pushTokens: { $in: invalidTokens } } as any,
+            if (!response.ok || (responseData?.data && responseData.data[0]?.status === 'error')) {
+              const ticketErr = responseData?.data?.[0]?.details?.error || responseData?.errors?.[0]?.code || 'PushFailed';
+              console.log(`[PushToken ${token.slice(0, 25)}...] Failed with code: ${ticketErr}`);
+              if (ticketErr === 'DeviceNotRegistered' || ticketErr === 'INVALID_TOKEN' || response.status === 400) {
+                invalidTokens.push(token);
+              }
             }
-          );
-        }
+          } catch (err) {
+            console.error(`[PushToken ${token.slice(0, 25)}...] Network error:`, err);
+          }
+        })
+      );
+
+      if (invalidTokens.length > 0) {
+        console.log('[NotificationService] Pruning invalid/unregistered Expo push tokens from DB:', invalidTokens);
+        await User.updateMany(
+          { $or: [{ pushToken: { $in: invalidTokens } }, { pushTokens: { $in: invalidTokens } }] },
+          {
+            $pull: { pushTokens: { $in: invalidTokens } } as any,
+          }
+        );
       }
     } catch (err) {
-      // Log Expo push failure without interrupting callers
       console.error('[NotificationService] Expo Push API request error (isolated):', err);
     }
   }
